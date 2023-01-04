@@ -12,7 +12,7 @@ namespace TranslationLibrary.Glossary
 
         public override string SubContext { get; set; } = "";
 
-        public override JsonObject FormatForDump()
+        public override JsonObject FormatForDump(DumpFlags optionsFlags)
         {
             var obj = new JsonObject();
             obj.Add(new("id", GetUniqId()));

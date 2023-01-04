@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
+using TranslationLibrary.Dialogue;
 
 namespace TranslationLibrary;
 
@@ -12,7 +13,7 @@ public static class Helpers
     {
         Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
     }
-    
+
     private static List<StringWithHash> FilterTopicsForText(string text,
         Dictionary<string, StringWithHash> topics)
     {
@@ -22,10 +23,10 @@ public static class Helpers
             .Select(_ => _.Value).ToList();
     }
 
-    public static string PrepareInfoText(string text, string script, Dictionary<string, StringWithHash> topics)
+    public static string PrepareInfoText(string text, string script, DialogueHelper? helper = null)
     {
         List<StringWithHash> topicList;
-        if (topics.Count == 0)
+        if (helper == null)
         {
             if (!script.Contains("addtopic", StringComparison.InvariantCultureIgnoreCase))
                 return text;
@@ -34,7 +35,7 @@ public static class Helpers
             topicList = matches.Select(_ => new StringWithHash() { Value = _.Groups[1].Value }).ToList();
         }
         else
-            topicList = FilterTopicsForText(text, topics);
+            topicList = FilterTopicsForText(text, helper.Dialogues);
 
         // sort by length DESC to match longest first
         topicList = topicList.OrderByDescending(_ => _.Value.Length).ToList();
@@ -69,8 +70,17 @@ public static class Helpers
     {
         // "GetPCRank",
         "MessageBox",
-        "Say\\s+\""
+        "Say\\s+\"",
+        "Choice"
     };
+    
+    // bad choices: ^\s*choice\s+(?<=\s)[^"]
+    //Name	Line	Text	Path
+    // Сталгрим_3213517364154376468_2282422603075131729_2677411163373231969_1.txt	1	Choice : "Да, вот один." 1 "Нет." 2
+    // Исследовать вместе_27908313681285523350_103918463143143475_7939321882060124566_1.txt	1	Choice ,"Вперед.", 3, "Ты - ненормальный.", 4
+    // Исследовать вместе_7939321882060124566_27908313681285523350_EMPTY_1.txt	1	Choice ,"Я сделаю это.", 3, "Я не могу помочь вам.", 4
+    // суджамма_12186127903207729714_1304111561233932196_3190830075182711833_1.txt	1	Choice Yes 1 No 2	
+
 
     public static bool ScriptCanBeTranslated(string script)
     {

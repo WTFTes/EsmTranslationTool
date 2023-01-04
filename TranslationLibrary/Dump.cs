@@ -56,15 +56,15 @@ public static class Dump
                 switch (overrideType)
                 {
                     case TextType.Script:
-                        File.WriteAllText(Path.Combine(recordDir, record.GetUniqId()) + ".txt",
+                        File.WriteAllText(Path.Combine(recordDir, record.GetUniqId()) + ".mwscript",
                             record.Text);
                         break;
                     case TextType.Html:
-                        File.WriteAllText(Path.Combine(recordDir, record.GetUniqId()) + ".tesbook",
+                        File.WriteAllText(Path.Combine(recordDir, record.GetUniqId()) + ".mwbook",
                             record.Text);
                         break;
                     case TextType.Text:
-                        textsByContextAndSubcontext.GetOrCreate(record.ContextName).GetOrCreate(record.SubContext).Add(record.FormatForDump());
+                        textsByContextAndSubcontext.GetOrCreate(record.ContextName).GetOrCreate(record.SubContext).Add(record.FormatForDump(options.Flags));
                         break;
                     default:
                         throw new Exception($"Unknown record text type '{record.Type}'");
@@ -124,7 +124,7 @@ public static class Dump
         List<T> records = new();
         switch (extension)
         {
-            case ".txt":
+            case ".mwscript":
             {
                 var record = new T();
                 record.ContextName = contextName;
@@ -135,7 +135,7 @@ public static class Dump
                 records.Add(record);
                 break;
             }
-            case ".tesbook":
+            case ".mwbook":
             {
                 var record = new T();
                 record.ContextName = contextName;

@@ -46,7 +46,7 @@ public class TranslationState : IDisposable
 
         _filePath = path;
         _encoding = encoding;
-        
+
         _localization.LoadNative(Path.GetDirectoryName(_filePath), _encoding, FileContext);
 
         _state = Imports.Translation_GetTexts(path, encoding);
@@ -78,11 +78,25 @@ public class TranslationState : IDisposable
                     contextId = localizationEntry.Target;
             }
 
-            if (record.ContextName == "INFO" && record.Type == TextType.Text)
+            if (record.ContextName == "INFO")
             {
-                record.OriginalText =
-                    record.UnprocessedOriginalText = Helpers.ReplacePseudoAsterisks(record.OriginalText);
-                record.Text = Helpers.ReplacePseudoAsterisks(record.Text);
+                var dialogue = record.Meta["dialogue"].ToString();
+                var dialogueType = record.Meta["dialogue_type"].ToString();
+                if (Enum.Parse<DialogueType>(dialogueType) == DialogueType.Topic)
+                {
+                    var localizationEntry = _localization.DialogueNames.LookupBySource(dialogue);
+                    if (localizationEntry != null)
+                        dialogue = localizationEntry.Target;
+                }
+
+                contextId = $"{dialogue}_{contextId}";
+
+                if (record.Type == TextType.Text)
+                {
+                    record.OriginalText =
+                        record.UnprocessedOriginalText = Helpers.ReplacePseudoAsterisks(record.OriginalText);
+                    record.Text = Helpers.ReplacePseudoAsterisks(record.Text);
+                }
             }
 
             record.ContextId = !string.IsNullOrEmpty(contextId)
@@ -117,7 +131,7 @@ public class TranslationState : IDisposable
 
         var newOptions = DumpOptions.Clone(options);
         newOptions.TextTypes = new() { TextType.Script };
-        
+
         PrepareRecordsForDump(options);
 
         return Dump.DumpStore(path, _storage, sourceContext, options);
@@ -127,11 +141,11 @@ public class TranslationState : IDisposable
     {
         if (!Directory.Exists(path))
             throw new Exception($"Directory '{path}' does not exist");
-        
+
         var newOptions = DumpOptions.Clone(options);
         newOptions.TypesInclude = new() { "BOOK" };
         newOptions.TextTypes = new() { TextType.Html };
-        
+
         PrepareRecordsForDump(options);
 
         return Dump.DumpStore(path, _storage, sourceContext, options);
@@ -156,14 +170,14 @@ public class TranslationState : IDisposable
         if (infoRecords == null)
             return;
 
-        var topics = options.HasFlag(DumpFlags.IncludeFullTopics) ? DialogueHelper.CollectDialogueTopics(this) : new();
+        DialogueHelper? dialogueHelper = null;
 
         foreach (var (_, record) in infoRecords)
         {
             if (record.Type != TextType.Text)
                 continue;
 
-            if (!options.HasFlag(DumpFlags.IncludeFullTopics | DumpFlags.IncludeImplicitTopics))
+            if (!options.HasFlag(DumpFlags.IncludeFullTopics) && !options.HasFlag(DumpFlags.IncludeImplicitTopics))
             {
                 record.OriginalText = record.UnprocessedOriginalText;
                 continue;
@@ -175,11 +189,15 @@ public class TranslationState : IDisposable
 
             var script = record.Meta["script"].ToString();
             if (options.HasFlag(DumpFlags.IncludeFullTopics))
+            {
+                if (dialogueHelper == null && options.HasFlag(DumpFlags.IncludeFullTopics))
+                    dialogueHelper = DialogueHelper.Create(this);
                 record.OriginalText = Helpers.PrepareInfoText(record.UnprocessedOriginalText,
-                    script, topics);
+                    script, dialogueHelper);
+            }
             else if (options.HasFlag(DumpFlags.IncludeImplicitTopics))
                 record.OriginalText = Helpers.PrepareInfoText(record.UnprocessedOriginalText,
-                    script, new());
+                    script);
         }
     }
 
@@ -195,7 +213,7 @@ public class TranslationState : IDisposable
 
         return !_nonTranslatedContextNames.Contains(contextName);
     }
-    
+
     public void Save(string path, string encoding, SaveOptions options = SaveOptions.None)
     {
         foreach (var record in _storage.Records)

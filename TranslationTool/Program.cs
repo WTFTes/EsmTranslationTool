@@ -23,7 +23,7 @@ namespace TranslationTool // Note: actual namespace depends on the project name.
                     ExtractArgumentsTemplate.Encoding,
                     ExtractArgumentsTemplate.GlossaryDirectories,
                     ExtractArgumentsTemplate.OutputPath,
-                    ExtractArgumentsTemplate.Merge,
+                    ExtractArgumentsTemplate.NoMerge,
                     ExtractArgumentsTemplate.TypesInclude,
                     ExtractArgumentsTemplate.TypesSkip,
                     ExtractArgumentsTemplate.TextTypes,
@@ -47,7 +47,7 @@ namespace TranslationTool // Note: actual namespace depends on the project name.
                     // context.Console.WriteLine($"Glossaries: "  + string.Join(", ", parameters.GlossaryDirectories));
                     parameters.OutputPath = result.GetValueForOption(ExtractArgumentsTemplate.OutputPath);
                     // context.Console.WriteLine($"Output: {parameters.OutputPath}");
-                    parameters.Merge = result.GetValueForOption(ExtractArgumentsTemplate.Merge);
+                    parameters.NoMerge = result.GetValueForOption(ExtractArgumentsTemplate.NoMerge);
                     parameters.TypesInclude = result.GetValueForOption(ExtractArgumentsTemplate.TypesInclude);
                     parameters.TypesSkip = result.GetValueForOption(ExtractArgumentsTemplate.TypesSkip);
                     parameters.TextTypes = result.GetValueForOption(ExtractArgumentsTemplate.TextTypes);
@@ -203,9 +203,9 @@ namespace TranslationTool // Note: actual namespace depends on the project name.
             parseArgument: result => ValidateDirectory(result, "texts")
         );
 
-        public static readonly Option<bool> Merge = new(
-            name: "--merge",
-            description: "Input files will be merged"
+        public static readonly Option<bool> NoMerge = new(
+            name: "--no-merge",
+            description: "Input files will be not be merged, extracted contents will be put to separate subdirectories"
         );
 
         public static readonly Option<string[]> TypesInclude = new(

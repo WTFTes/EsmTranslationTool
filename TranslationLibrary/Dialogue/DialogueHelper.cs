@@ -10,15 +10,32 @@ namespace TranslationLibrary.Dialogue
 {
     public class DialogueHelper
     {
-        private Dictionary<string, StringWithHash> _dialogues = new();
-    
+        public Dictionary<string, StringWithHash> Dialogues { get; private set; } = new();
+
+        public static DialogueHelper Create(TranslationState state)
+        {
+            DialogueHelper helper = new();
+
+            helper.Load(state);
+
+            return helper;
+        }
+
+        public static DialogueHelper Create(string path)
+        {
+            DialogueHelper helper = new();
+            helper.Load(path);
+
+            return helper;
+        }
+
         public static Dictionary<string, StringWithHash> CollectDialogueTopics(TranslationState state)
         {
             var topics = state.RecordsByContextAndId.GetValueOrDefault("DIAL");
             if (topics == null)
                 return new();
 
-            return topics.Select(_ => new StringWithHash() { Value = _.Key }).DistinctBy(_ => _.Value)
+            return topics.Select(_ => new StringWithHash() { Value = _.Value.Text }).DistinctBy(_ => _.Value)
                 .OrderByDescending(_ => _.Value.Length)
                 .ToDictionary(_ => _.Value);
         }
@@ -28,22 +45,22 @@ namespace TranslationLibrary.Dialogue
             if (!Directory.Exists(path))
                 throw new Exception($"Directory '{path}' does not exist");
 
-            IEnumerable<StringWithHash> colection = new List<StringWithHash>();
+            IEnumerable<StringWithHash> collection = new List<StringWithHash>();
 
             foreach (var file in Directory.GetFiles(path))
             {
                 if (Path.GetExtension(file) != ".txt")
                     continue;
 
-                colection = colection.Concat(LoadDialogues(file));
+                collection = collection.Concat(LoadDialogues(file));
             }
 
-            _dialogues = colection.DistinctBy(_ => _.Value).OrderByDescending(_ => _.Value).ToDictionary(_ => _.Value);
+            Dialogues = collection.DistinctBy(_ => _.Value).OrderByDescending(_ => _.Value).ToDictionary(_ => _.Value);
         }
 
         public void Load(TranslationState state, string additionalPath = "")
         {
-            _dialogues = CollectDialogueTopics(state);
+            Dialogues = CollectDialogueTopics(state);
 
             if (!string.IsNullOrEmpty(additionalPath) && Directory.Exists(additionalPath))
                 Load(additionalPath);
@@ -78,7 +95,7 @@ namespace TranslationLibrary.Dialogue
 
             foreach (var (_, phraseForm) in localizations.DialoguePhraseForms.Records)
             {
-                if (!_dialogues.ContainsKey(phraseForm.Source))
+                if (!Dialogues.ContainsKey(phraseForm.Source))
                     phraseFormProblems.Add(
                         $"Phraseform '{phraseForm.Target}' refers to unknown dialogue '{phraseForm.Source}'");
             }
@@ -86,7 +103,7 @@ namespace TranslationLibrary.Dialogue
 
         private string CheckKnownTopicOrPhraseForm(string topic, LocalizationStore localizations)
         {
-            if (_dialogues.ContainsKey(topic))
+            if (Dialogues.ContainsKey(topic))
                 return "";
 
             var phraseForm = localizations.DialoguePhraseForms.LookupByTarget(topic);

@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text.Json.Nodes;
 using System.Text.Json.Serialization;
 using TranslationLibrary.Enums;
@@ -39,6 +40,12 @@ public class TranslationRecord : EntityRecord
             return true;
 
         return base.IsIgnoredForDump(options);
+    }
+
+    public override JsonObject FormatForDump(DumpFlags optionsFlags)
+    {
+        var text = optionsFlags.HasFlag(DumpFlags.TranslatedText) ? Text : OriginalText;
+        return new JsonObject(new List<KeyValuePair<string, JsonNode?>>() { new(GetUniqId(), text) });
     }
 
     [JsonIgnore]

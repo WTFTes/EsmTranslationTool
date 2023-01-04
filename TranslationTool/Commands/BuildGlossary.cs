@@ -36,9 +36,9 @@ public static class BuildGlossary
 
                 console.WriteLine($"Loading original '{Path.GetFileName(parameters.OriginalEsms[i])}'...");
                 origState.Load(parameters.OriginalEsms[i], parameters.OriginalEncoding);
+                origState.PrepareRecordsForDump(new() { Flags = dumpFlags });
                 console.WriteLine($"Loading localized '{Path.GetFileName(parameters.LocalizedEsms[i])}'...");
                 localizedState.Load(parameters.LocalizedEsms[i], parameters.LocalizedEncoding);
-                localizedState.PrepareRecordsForDump(new() { Flags = dumpFlags });
 
                 builder.Build(origState, localizedState);
                 console.WriteLine(

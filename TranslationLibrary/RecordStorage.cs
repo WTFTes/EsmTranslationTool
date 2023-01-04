@@ -1,7 +1,6 @@
 ﻿using System.Collections.Generic;
 using TranslationLibrary.Enums;
 using TranslationLibrary.Glossary;
-using TranslationLibrary.Localization;
 
 namespace TranslationLibrary;
 

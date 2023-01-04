@@ -16,7 +16,7 @@ public class ExtractParameters
     public string[]? TypesSkip { get; set; }
     public TextType[]? TextTypes { get; set; }
     public string OutputPath { get; set; }
-    public bool Merge { get; set; }
+    public bool NoMerge { get; set; }
     public bool MarkTopics { get; set; }
     public bool AllScripts { get; set; }
     public bool AllToJson { get; set; }
@@ -114,7 +114,7 @@ public static class Extract
 
                 state.PrepareRecordsForDump(options);
 
-                if (parameters.Merge)
+                if (!parameters.NoMerge)
                     mergedState.Merge(state);
                 else
                 {
@@ -137,7 +137,7 @@ public static class Extract
                 }
             }
 
-            if (parameters.Merge)
+            if (!parameters.NoMerge)
             {
                 var dumpPath = Path.Combine(parameters.OutputPath);
                 if (!Directory.Exists(dumpPath))

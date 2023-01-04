@@ -46,7 +46,7 @@ public class EntityRecord
         return !string.IsNullOrEmpty(ContextId) ? ContextId : Text;
     }
 
-    public virtual JsonObject FormatForDump()
+    public virtual JsonObject FormatForDump(DumpFlags optionsFlags)
     {
         return new JsonObject(new List<KeyValuePair<string, JsonNode?>>() { new(GetUniqId(), Text) });
     }

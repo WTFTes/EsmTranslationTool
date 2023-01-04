@@ -14,4 +14,5 @@ public enum DumpFlags : ulong
     AllScripts = 32,
     AllToJson = 64,
     TextOnly = 128,
+    TranslatedText = 256,
 }
