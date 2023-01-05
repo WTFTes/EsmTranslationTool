@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using System.Text.RegularExpressions;
 using TranslationLibrary.Dialogue;
+using TranslationLibrary.Translation;
 
 namespace TranslationLibrary;
 
@@ -23,8 +24,10 @@ public static class Helpers
             .Select(_ => _.Value).ToList();
     }
 
-    public static string PrepareInfoText(string text, string script, DialogueHelper? helper = null)
+    public static string MarkupDialogues(string text, string script, out List<string> foundDialogues, DialogueHelper? helper = null)
     {
+        foundDialogues = new();
+        
         List<StringWithHash> topicList;
         if (helper == null)
         {
@@ -54,11 +57,23 @@ public static class Helpers
                 return rep;
             }, RegexOptions.IgnoreCase);
         }
+        
+        foundDialogues.AddRange(matched);
 
         for (var i = 0; i < matched.Count; ++i)
             text = text.Replace("{" + i + "}", "@" + matched[i] + "#");
 
         return text.Trim();
+    }
+
+    public static string AppendDialogues(TranslationRecord record, string script, DialogueHelper? helper)
+    {
+        MarkupDialogues(record.UnprocessedOriginalText, script, out var foundDialogues, helper);
+
+        if (foundDialogues.Count == 0)
+            return record.Text;
+
+        return "";
     }
 
     public static string StripHyperlinks(string text)

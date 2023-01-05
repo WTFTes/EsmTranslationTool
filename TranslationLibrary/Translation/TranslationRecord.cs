@@ -42,12 +42,6 @@ public class TranslationRecord : EntityRecord
         return base.IsIgnoredForDump(options);
     }
 
-    public override JsonObject FormatForDump(DumpFlags optionsFlags)
-    {
-        var text = optionsFlags.HasFlag(DumpFlags.TranslatedText) ? Text : OriginalText;
-        return new JsonObject(new List<KeyValuePair<string, JsonNode?>>() { new(GetUniqId(), text) });
-    }
-
     [JsonIgnore]
     public IntPtr Pointer { get; set; } = IntPtr.Zero;
 

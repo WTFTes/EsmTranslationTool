@@ -26,19 +26,20 @@ public static class Dump
         List<string> createdDirectoriesByType = new();
         Dictionary<string, Dictionary<string, List<JsonObject>>> textsByContextAndSubcontext = new();
 
-        foreach (var byContext in storage.RecordsByContextAndId)
+        Dictionary<string, int> recordsPerSubcontext = new();
+
+        foreach (var (contextName, byContext) in storage.RecordsByContextAndId)
         {
-            stats.GetOrCreate(byContext.Key).Total = byContext.Value.Count;
-            foreach (var byId in byContext.Value)
+            stats.GetOrCreate(contextName).Total = byContext.Count;
+            foreach (var (_, record) in byContext)
             {
-                var record = byId.Value;
                 if (record.IsIgnoredForDump(options))
                 {
                     ++stats.GetOrCreate(record.ContextName).Skipped;
                     continue;
                 }
 
-                var contextPart = !options.Flags.HasFlag(DumpFlags.SkipFileContextLevel) ? sourceContext : "";
+                var contextPart = !options.HasFlag(DumpFlags.SkipFileContextLevel) ? sourceContext : "";
                 var recordDir = Path.Combine(path, contextPart, record.ContextName);
 
                 if (!createdDirectoriesByType.Contains(record.ContextName))
@@ -64,7 +65,24 @@ public static class Dump
                             record.Text);
                         break;
                     case TextType.Text:
-                        textsByContextAndSubcontext.GetOrCreate(record.ContextName).GetOrCreate(record.SubContext).Add(record.FormatForDump(options.Flags));
+                        var subContext = record.SubContext;
+                        if (options.RecordsPerFile > 0)
+                        {
+                            var counterContext = sourceContext + "_" + contextName + "_" + subContext;
+                            if (!recordsPerSubcontext.ContainsKey(counterContext))
+                                recordsPerSubcontext[counterContext] = 0;
+
+                            if (!string.IsNullOrEmpty(subContext))
+                                subContext += "_";
+
+                            var offset = recordsPerSubcontext[counterContext] / options.RecordsPerFile; 
+                            subContext +=
+                                $"{offset * options.RecordsPerFile + 1}-{(offset + 1) * options.RecordsPerFile}";
+
+                            ++recordsPerSubcontext[counterContext];
+                        }
+
+                        textsByContextAndSubcontext.GetOrCreate(record.ContextName).GetOrCreate(subContext).Add(record.FormatForDump(options.Flags));
                         break;
                     default:
                         throw new Exception($"Unknown record text type '{record.Type}'");
@@ -72,20 +90,20 @@ public static class Dump
             }
         }
 
-        foreach (var byContext in textsByContextAndSubcontext)
+        foreach (var (contextName, bySubcontext) in textsByContextAndSubcontext)
         {
-            foreach (var bySubcontext in byContext.Value)
+            foreach (var (subContext, values) in bySubcontext)
             {
                 var contextPart = !options.HasFlag(DumpFlags.SkipFileContextLevel) ? sourceContext : "";
-                var recordDir = Path.Combine(path, contextPart, byContext.Key);
+                var recordDir = Path.Combine(path, contextPart, contextName);
 
-                var text = JsonSerializer.Serialize(bySubcontext.Value, new JsonSerializerOptions()
+                var text = JsonSerializer.Serialize(values, new JsonSerializerOptions()
                 {
                     Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
                     WriteIndented = true,
                 });
 
-                var suffix = bySubcontext.Key;
+                var suffix = subContext;
                 if (!string.IsNullOrEmpty(suffix))
                     suffix = "_" + suffix;
 

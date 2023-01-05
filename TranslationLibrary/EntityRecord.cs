@@ -9,7 +9,8 @@ public class EntityRecord
 {
     public string ContextId { get; set; } = "";
     public string ContextName { get; set; } = "";
-    public virtual string Text { get; set; } = "";
+    public string Text { get; set; } = "";
+    public string OriginalText { get; set; } = "";
     
     [JsonConverter(typeof(JsonStringEnumConverter))]
     public TextType Type { get; set; }
@@ -48,7 +49,9 @@ public class EntityRecord
 
     public virtual JsonObject FormatForDump(DumpFlags optionsFlags)
     {
-        return new JsonObject(new List<KeyValuePair<string, JsonNode?>>() { new(GetUniqId(), Text) });
+        var text = optionsFlags.HasFlag(DumpFlags.TranslatedText) ? Text : OriginalText;
+
+        return new JsonObject(new List<KeyValuePair<string, JsonNode?>>() { new(GetUniqId(), text) });
     }
 
     public virtual void FromDump(JsonObject obj)

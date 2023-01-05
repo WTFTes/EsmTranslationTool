@@ -21,6 +21,7 @@ public class DumpOptions : ICloneable
     public List<TextType> TextTypes = new();
     public Regex? TextSkipRegex;
     public Regex? TextMatchRegex;
+    public int RecordsPerFile = 0;
 
     public bool NeedDumpText(string text)
     {

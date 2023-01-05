@@ -22,6 +22,7 @@ public class ExtractParameters
     public bool AllToJson { get; set; }
     public string? RegexMatch { get; set; }
     public string? RegexExclude { get; set; }
+    public int RecordsPerFile { get; set; }
 }
 
 public static class Extract
@@ -86,6 +87,8 @@ public static class Extract
             {
                 throw new Exception($"Regexp '{parameters.RegexExclude}' parse failed: {e.Message}");
             }
+
+            options.RecordsPerFile = parameters.RecordsPerFile;
 
             var totalRecords = 0;
             foreach (var esm in parameters.InputEsms)

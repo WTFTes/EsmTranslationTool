@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 using System.Text.Json.Nodes;
 using TranslationLibrary.Enums;
 
@@ -6,22 +7,18 @@ namespace TranslationLibrary.Glossary
 {
     public class GlossaryRecord : EntityRecord
     {
-        public string OriginalText { get; set; } = "";
-
         public MatchType MatchType { get; set; }
-
-        public override string SubContext { get; set; } = "";
 
         public override JsonObject FormatForDump(DumpFlags optionsFlags)
         {
-            var obj = new JsonObject();
-            obj.Add(new("id", GetUniqId()));
-            obj.Add(new("source", OriginalText));
-            obj.Add(new("target", Text));
-            obj.Add(new("type", Type.ToString()));
-            obj.Add(new("match_type", MatchType.ToString()));
-
-            return obj;
+            return new JsonObject(new List<KeyValuePair<string, JsonNode?>>()
+            {
+                new("id", GetUniqId()),
+                new("source", OriginalText),
+                new("target", Text),
+                new("type", Type.ToString()),
+                new("match_type", MatchType.ToString()),
+            });
         }
 
         public override void FromDump(JsonObject obj)

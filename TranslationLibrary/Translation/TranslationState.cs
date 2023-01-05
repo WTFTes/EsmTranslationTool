@@ -192,16 +192,16 @@ public class TranslationState : IDisposable
             {
                 if (dialogueHelper == null && options.HasFlag(DumpFlags.IncludeFullTopics))
                     dialogueHelper = DialogueHelper.Create(this);
-                record.OriginalText = Helpers.PrepareInfoText(record.UnprocessedOriginalText,
-                    script, dialogueHelper);
+                record.OriginalText = Helpers.MarkupDialogues(record.UnprocessedOriginalText,
+                    script, out _, dialogueHelper);
             }
             else if (options.HasFlag(DumpFlags.IncludeImplicitTopics))
-                record.OriginalText = Helpers.PrepareInfoText(record.UnprocessedOriginalText,
-                    script);
+                record.OriginalText = Helpers.MarkupDialogues(record.UnprocessedOriginalText,
+                    script, out _);
         }
     }
 
-    private static readonly List<string> _nonTranslatedContextNames = new()
+    private static readonly List<string> NonTranslatedContextNames = new()
     {
         "CELL", "REGN"
     };
@@ -211,7 +211,7 @@ public class TranslationState : IDisposable
         if (contextName == "REGN" && options.HasFlag(SaveOptions.TranslateRegions))
             return true;
 
-        return !_nonTranslatedContextNames.Contains(contextName);
+        return !NonTranslatedContextNames.Contains(contextName);
     }
 
     public void Save(string path, string encoding, SaveOptions options = SaveOptions.None)

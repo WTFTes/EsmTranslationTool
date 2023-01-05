@@ -32,6 +32,7 @@ namespace TranslationTool // Note: actual namespace depends on the project name.
                     ExtractArgumentsTemplate.AllToJson,
                     ExtractArgumentsTemplate.RegexMatch,
                     ExtractArgumentsTemplate.RegexExclude,
+                    ExtractArgumentsTemplate.RecordsPerFile,
                 },
                 context =>
                 {
@@ -56,6 +57,7 @@ namespace TranslationTool // Note: actual namespace depends on the project name.
                     parameters.AllToJson = result.GetValueForOption(ExtractArgumentsTemplate.AllToJson);
                     parameters.RegexMatch = result.GetValueForOption(ExtractArgumentsTemplate.RegexMatch);
                     parameters.RegexExclude = result.GetValueForOption(ExtractArgumentsTemplate.RegexExclude);
+                    parameters.RecordsPerFile = result.GetValueForOption(ExtractArgumentsTemplate.RecordsPerFile);
                     // context.Console.WriteLine($"Split: {parameters.SplitByContext}");
 
                     Extract.Run(parameters, context.Console);
@@ -261,6 +263,11 @@ namespace TranslationTool // Note: actual namespace depends on the project name.
         public static readonly Option<string> RegexExclude = new(
             name: "--not-regexp",
             description: "Texts matching this regexp will not be extracted"
+        );
+
+        public static readonly Option<int> RecordsPerFile = new(
+            name: "--records-per-file",
+            description: "Maximum count of records per *.json file"
         );
     }
 
