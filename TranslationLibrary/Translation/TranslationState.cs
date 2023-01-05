@@ -73,7 +73,7 @@ public class TranslationState : IDisposable
             var contextId = info.ContextId;
             if (record.ContextName == "DIAL")
             {
-                var localizationEntry = _localization.DialogueNames.LookupBySource(record.OriginalText);
+                var localizationEntry = _localization.DialogueNames.LookupRecord(record.OriginalText);
                 if (localizationEntry != null)
                     contextId = localizationEntry.Target;
             }
@@ -84,7 +84,7 @@ public class TranslationState : IDisposable
                 var dialogueType = record.Meta["dialogue_type"].ToString();
                 if (Enum.Parse<DialogueType>(dialogueType) == DialogueType.Topic)
                 {
-                    var localizationEntry = _localization.DialogueNames.LookupBySource(dialogue);
+                    var localizationEntry = _localization.DialogueNames.LookupRecord(dialogue);
                     if (localizationEntry != null)
                         dialogue = localizationEntry.Target;
                 }

@@ -15,13 +15,13 @@ namespace TranslationLibrary.Localization
 {
     public class LocalizationStore
     {
-        private readonly MappingStore<MappingRecord> _cells = new();
-        private readonly MappingStore<MappingRecord> _dialogueNames = new();
-        private readonly MappingStore<MappingRecord> _dialoguePhraseForms = new();
+        private readonly LocalizationMappingStore _cells = new();
+        private readonly LocalizationMappingStore _dialogueNames = new();
+        private readonly LocalizationMappingStore _dialoguePhraseForms = new();
 
-        public MappingStore<MappingRecord> Cells => _cells;
-        public MappingStore<MappingRecord> DialogueNames => _dialogueNames;
-        public MappingStore<MappingRecord> DialoguePhraseForms => _dialoguePhraseForms;
+        public LocalizationMappingStore Cells => _cells;
+        public LocalizationMappingStore DialogueNames => _dialogueNames;
+        public LocalizationMappingStore DialoguePhraseForms => _dialoguePhraseForms;
 
         public bool IsEmpty => _cells.IsEmpty && _dialogueNames.IsEmpty && _dialoguePhraseForms.IsEmpty;
 
@@ -48,7 +48,7 @@ namespace TranslationLibrary.Localization
                 if (Path.GetFileNameWithoutExtension(file) != ".json")
                     continue;
 
-                var entries = JsonSerializer.Deserialize<List<MappingRecord>>(File.ReadAllText(file));
+                var entries = JsonSerializer.Deserialize<List<MappingRecord<string>>>(File.ReadAllText(file));
                 foreach (var entry in entries ?? new())
                 {
                     switch (entry.Type)
@@ -72,8 +72,7 @@ namespace TranslationLibrary.Localization
             if (!Directory.Exists(Path.GetDirectoryName(path)))
                 throw new Exception("Directory '{Path.GetDirectoryName(path)}' does not exist");
 
-            var tmp = _cells.Records.Concat(_dialogueNames.Records).Concat(_dialoguePhraseForms.Records)
-                .Select(_ => _.Value);
+            var tmp = _cells.Concat(_dialogueNames).Concat(_dialoguePhraseForms);
 
             var text = JsonSerializer.Serialize(tmp, new JsonSerializerOptions()
             {
@@ -86,11 +85,11 @@ namespace TranslationLibrary.Localization
 
         public void Merge(LocalizationStore otherLocalization)
         {
-            foreach (var (_, cel) in otherLocalization._cells.Records)
+            foreach (var cel in otherLocalization._cells)
                 _cells.Add(cel);
-            foreach (var (_, dialogue) in otherLocalization._dialogueNames.Records)
+            foreach (var dialogue in otherLocalization._dialogueNames)
                 _dialogueNames.Add(dialogue);
-            foreach (var (_, phraseForm) in otherLocalization._dialoguePhraseForms.Records)
+            foreach (var phraseForm in otherLocalization._dialoguePhraseForms)
                 _dialoguePhraseForms.Add(phraseForm);
         }
 
@@ -106,7 +105,7 @@ namespace TranslationLibrary.Localization
             SaveNativeLocalization(Path.Combine(path, contextName + ".top"), sysEncoding, _dialoguePhraseForms);
         }
 
-        private void LoadNativeLocalization(string filePath, MappingType type, Encoding encoding, MappingStore<MappingRecord> store)
+        private void LoadNativeLocalization(string filePath, MappingType type, Encoding encoding, LocalizationMappingStore store)
         {
             if (!File.Exists(filePath))
                 return;
@@ -120,7 +119,7 @@ namespace TranslationLibrary.Localization
             {
                 while (csv.Read())
                 {
-                    store.Add(new MappingRecord()
+                    store.Add(new()
                     {
                         Type = type,
                         Source = csv.GetField<string>(0),
@@ -130,7 +129,7 @@ namespace TranslationLibrary.Localization
             }
         }
 
-        private void SaveNativeLocalization(string path, Encoding encoding, MappingStore<MappingRecord> store)
+        private void SaveNativeLocalization(string path, Encoding encoding, LocalizationMappingStore store)
         {
             if (!Directory.Exists(Path.GetDirectoryName(path)))
                 throw new Exception("Directory does not exist");
@@ -147,10 +146,10 @@ namespace TranslationLibrary.Localization
                        HasHeaderRecord = false,
                    }))
             {
-                foreach (var item in store.Records)
+                foreach (var item in store)
                 {
-                    csv.WriteField(item.Value.Source);
-                    csv.WriteField(item.Value.Target);
+                    csv.WriteField(item.Source);
+                    csv.WriteField(item.Target);
 
                     csv.NextRecord();
                 }
@@ -171,7 +170,7 @@ namespace TranslationLibrary.Localization
 
             foreach (var (_, dialogue) in dialogues)
                 if (dialogue.IsTranslated)
-                    _dialogueNames.Add(new MappingRecord()
+                    _dialogueNames.Add(new()
                         { Type = MappingType.Topic, Source = dialogue.UnprocessedOriginalText, Target = dialogue.Text });
         }
 
@@ -182,7 +181,7 @@ namespace TranslationLibrary.Localization
             {
                 foreach (var (_, cell) in cells)
                     if (cell.IsTranslated)
-                        _cells.Add(new MappingRecord()
+                        _cells.Add(new()
                             { Type = MappingType.Cell, Source = cell.UnprocessedOriginalText, Target = cell.Text });
             }
 
@@ -191,7 +190,7 @@ namespace TranslationLibrary.Localization
             {
                 foreach (var (_, region) in regions)
                     if (region.IsTranslated)
-                        _cells.Add(new MappingRecord()
+                        _cells.Add(new()
                             { Type = MappingType.Cell, Source = region.UnprocessedOriginalText, Target = region.Text });
             }
         }

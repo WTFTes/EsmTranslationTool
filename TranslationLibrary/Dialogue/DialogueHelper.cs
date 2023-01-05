@@ -93,7 +93,7 @@ namespace TranslationLibrary.Dialogue
                 }
             }
 
-            foreach (var (_, phraseForm) in localizations.DialoguePhraseForms.Records)
+            foreach (var phraseForm in localizations.DialoguePhraseForms)
             {
                 if (!Dialogues.ContainsKey(phraseForm.Source))
                     phraseFormProblems.Add(
@@ -106,7 +106,7 @@ namespace TranslationLibrary.Dialogue
             if (Dialogues.ContainsKey(topic))
                 return "";
 
-            var phraseForm = localizations.DialoguePhraseForms.LookupByTarget(topic);
+            var phraseForm = localizations.DialoguePhraseForms.LookupRecordByTarget(topic);
             if (phraseForm != null)
                 return "";
 
