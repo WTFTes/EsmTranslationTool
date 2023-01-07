@@ -13,7 +13,7 @@ using TranslationLibrary.Translation;
 
 namespace TranslationLibrary.Localization
 {
-    public class LocalizationStore
+    public class LocalizationStorage
     {
         private readonly LocalizationMappingStore _cells = new();
         private readonly LocalizationMappingStore _dialogueNames = new();
@@ -23,7 +23,7 @@ namespace TranslationLibrary.Localization
         public LocalizationMappingStore DialogueNames => _dialogueNames;
         public LocalizationMappingStore DialoguePhraseForms => _dialoguePhraseForms;
 
-        public bool IsEmpty => _cells.IsEmpty && _dialogueNames.IsEmpty && _dialoguePhraseForms.IsEmpty;
+        public bool IsEmpty => _cells.Empty && _dialogueNames.Empty && _dialoguePhraseForms.Empty;
 
         public void Clear()
         {
@@ -70,7 +70,7 @@ namespace TranslationLibrary.Localization
         public void Save(string path)
         {
             if (!Directory.Exists(Path.GetDirectoryName(path)))
-                throw new Exception("Directory '{Path.GetDirectoryName(path)}' does not exist");
+                throw new Exception($"Directory '{Path.GetDirectoryName(path)}' does not exist");
 
             var tmp = _cells.Concat(_dialogueNames).Concat(_dialoguePhraseForms);
 
@@ -83,7 +83,7 @@ namespace TranslationLibrary.Localization
             File.WriteAllText(path, text);
         }
 
-        public void Merge(LocalizationStore otherLocalization)
+        public void Merge(LocalizationStorage otherLocalization)
         {
             foreach (var cel in otherLocalization._cells)
                 _cells.Add(cel);
@@ -110,22 +110,20 @@ namespace TranslationLibrary.Localization
             if (!File.Exists(filePath))
                 return;
 
-            using (var reader = new StreamReader(filePath, encoding))
-            using (var csv = new CsvReader(reader,
-                       new CsvConfiguration(CultureInfo.InvariantCulture)
-                       {
-                           HasHeaderRecord = false, Delimiter = "\t", Encoding = encoding,
-                       }))
-            {
-                while (csv.Read())
+            using var reader = new StreamReader(filePath, encoding);
+            using var csv = new CsvReader(reader,
+                new CsvConfiguration(CultureInfo.InvariantCulture)
                 {
-                    store.Add(new()
-                    {
-                        Type = type,
-                        Source = csv.GetField<string>(0),
-                        Target = csv.GetField<string>(1),
-                    });
-                }
+                    HasHeaderRecord = false, Delimiter = "\t", Encoding = encoding,
+                });
+            while (csv.Read())
+            {
+                store.Add(new()
+                {
+                    Type = type,
+                    Source = csv.GetField<string>(0),
+                    Target = csv.GetField<string>(1),
+                });
             }
         }
 
@@ -135,24 +133,23 @@ namespace TranslationLibrary.Localization
                 throw new Exception("Directory does not exist");
 
             // overwrite with empty if file exists
-            if (store.IsEmpty && !File.Exists(path))
+            if (store.Empty && !File.Exists(path))
                 return;
-        
-            using (var stream = new FileStream(path, FileMode.Create, FileAccess.Write))
-            using (var writer = new StreamWriter(stream, encoding))
-            using (var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)
-                   {
-                       Delimiter = "\t", Encoding = encoding,
-                       HasHeaderRecord = false,
-                   }))
-            {
-                foreach (var item in store)
-                {
-                    csv.WriteField(item.Source);
-                    csv.WriteField(item.Target);
 
-                    csv.NextRecord();
-                }
+            using var stream = new FileStream(path, FileMode.Create, FileAccess.Write);
+            using var writer = new StreamWriter(stream, encoding);
+            using var csv = new CsvWriter(writer, new CsvConfiguration(CultureInfo.InvariantCulture)
+            {
+                Delimiter = "\t", Encoding = encoding,
+                HasHeaderRecord = false,
+            });
+            
+            foreach (var item in store)
+            {
+                csv.WriteField(item.Source);
+                csv.WriteField(item.Target);
+
+                csv.NextRecord();
             }
         }
 
@@ -164,11 +161,11 @@ namespace TranslationLibrary.Localization
 
         private void UpdateMrk(TranslationState state)
         {
-            var dialogues = state.Storage.RecordsByContextAndId.GetValueOrDefault("DIAL");
+            var dialogues = state.Storage.LookupContext("DIAL");
             if (dialogues == null)
                 return;
 
-            foreach (var (_, dialogue) in dialogues)
+            foreach (var dialogue in dialogues)
                 if (dialogue.IsTranslated)
                     _dialogueNames.Add(new()
                         { Type = MappingType.Topic, Source = dialogue.UnprocessedOriginalText, Target = dialogue.Text });
@@ -176,19 +173,19 @@ namespace TranslationLibrary.Localization
 
         private void UpdateCel(TranslationState state)
         {
-            var cells = state.Storage.RecordsByContextAndId.GetValueOrDefault("CELL");
+            var cells = state.Storage.LookupContext("CELL");
             if (cells != null)
             {
-                foreach (var (_, cell) in cells)
+                foreach (var cell in cells)
                     if (cell.IsTranslated)
                         _cells.Add(new()
                             { Type = MappingType.Cell, Source = cell.UnprocessedOriginalText, Target = cell.Text });
             }
 
-            var regions = state.Storage.RecordsByContextAndId.GetValueOrDefault("REGN");
+            var regions = state.Storage.LookupContext("REGN");
             if (regions != null)
             {
-                foreach (var (_, region) in regions)
+                foreach (var region in regions)
                     if (region.IsTranslated)
                         _cells.Add(new()
                             { Type = MappingType.Cell, Source = region.UnprocessedOriginalText, Target = region.Text });

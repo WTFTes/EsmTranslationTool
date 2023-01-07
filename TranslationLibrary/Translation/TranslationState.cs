@@ -15,24 +15,20 @@ public class TranslationState : IDisposable
 
     private IntPtr _state;
 
-    private readonly RecordStorage<TranslationRecord> _storage = new();
-    private readonly LocalizationStore _localization = new();
+    private readonly LocalizationStorage _localization = new();
 
-    public List<TranslationRecord> Records => _storage.Records;
-
-    public Dictionary<string, Dictionary<string, TranslationRecord>> RecordsByContextAndId =>
-        _storage.RecordsByContextAndId;
+    public IEnumerable<TranslationRecord> Records => Storage.Records;
 
     public string FilePath => _filePath;
     public string Encoding => _encoding;
     public string FileContext => Path.GetFileNameWithoutExtension(FilePath);
 
-    public RecordStorage<TranslationRecord> Storage => _storage;
+    public TranslationStorage Storage { get; } = new();
 
     public void Merge(TranslationState other, MergeMode mode = MergeMode.Full)
     {
         _encoding = other._encoding;
-        _storage.Merge(other._storage, mode);
+        Storage.Merge(other.Storage, mode);
         _localization.Merge(other._localization);
     }
 
@@ -41,7 +37,7 @@ public class TranslationState : IDisposable
         if (_state != IntPtr.Zero)
         {
             Dispose();
-            _storage.Clear();
+            Storage.Clear();
         }
 
         _filePath = path;
@@ -63,6 +59,7 @@ public class TranslationState : IDisposable
             {
                 Pointer = info.Pointer,
                 Type = (TextType)info.Type,
+                MaxLength = info.MaxLength,
                 OriginalText = info.Source,
                 UnprocessedOriginalText = info.Source,
                 Text = info.Target,
@@ -103,28 +100,11 @@ public class TranslationState : IDisposable
                 ? $"{contextId}_{info.Index}"
                 : $"{record.OriginalText}_{info.Index}";
 
-            _storage.Add(record);
+            Storage.Add(record);
         }
     }
 
-    // private bool HasTranslation(TranslationRecord record)
-    // {
-    //     if (Translated == null)
-    //         return false;
-    //
-    //     var candidate = Translated.LookupRecord(record);
-    //     if (candidate == null)
-    //         return false;
-    //
-    //     var matches = Regex.Matches(candidate.OriginalText, "[А-Яа-я]");
-    //     var isMatch = (float)matches.Count / candidate.OriginalText.Length > 0.2;
-    //     if (candidate.ContextName == "BOOK" && candidate.Type == TextType.Html && isMatch)
-    //         return isMatch;
-    //
-    //     return isMatch;
-    // }
-
-    public Dictionary<string, Dump.DumpInfo> DumpScripts(string path, string sourceContext, DumpOptions options)
+    public Dictionary<string, TranslationStorage.DumpInfo> DumpScripts(string path, string sourceContext, DumpOptions options)
     {
         if (!Directory.Exists(path))
             throw new Exception($"Directory '{path}' does not exist");
@@ -134,10 +114,10 @@ public class TranslationState : IDisposable
 
         PrepareRecordsForDump(options);
 
-        return Dump.DumpStore(path, _storage, sourceContext, options);
+        return Storage.DumpStore(path, sourceContext, options);
     }
 
-    public Dictionary<string, Dump.DumpInfo> DumpBooks(string path, string sourceContext, DumpOptions options)
+    public Dictionary<string, TranslationStorage.DumpInfo> DumpBooks(string path, string sourceContext, DumpOptions options)
     {
         if (!Directory.Exists(path))
             throw new Exception($"Directory '{path}' does not exist");
@@ -148,10 +128,10 @@ public class TranslationState : IDisposable
 
         PrepareRecordsForDump(options);
 
-        return Dump.DumpStore(path, _storage, sourceContext, options);
+        return Storage.DumpStore(path, sourceContext, options);
     }
 
-    public Dictionary<string, Dump.DumpInfo> DumpNPCs(string path, string sourceContext, DumpOptions options)
+    public Dictionary<string, TranslationStorage.DumpInfo> DumpNPCs(string path, string sourceContext, DumpOptions options)
     {
         if (!Directory.Exists(path))
             throw new Exception($"Directory '{path}' does not exist");
@@ -161,18 +141,18 @@ public class TranslationState : IDisposable
 
         PrepareRecordsForDump(options);
 
-        return Dump.DumpStore(path, _storage, sourceContext, options);
+        return Storage.DumpStore(path, sourceContext, options);
     }
 
     public void PrepareRecordsForDump(DumpOptions options)
     {
-        var infoRecords = _storage.RecordsByContextAndId.GetValueOrDefault("INFO");
+        var infoRecords = Storage.LookupContext("INFO");
         if (infoRecords == null)
             return;
 
         DialogueHelper? dialogueHelper = null;
 
-        foreach (var (_, record) in infoRecords)
+        foreach (var record in infoRecords)
         {
             if (record.Type != TextType.Text)
                 continue;
@@ -216,7 +196,7 @@ public class TranslationState : IDisposable
 
     public void Save(string path, string encoding, SaveOptions options = SaveOptions.None)
     {
-        foreach (var record in _storage.Records)
+        foreach (var record in Storage.Records)
         {
             if (!NeedSaveContext(record.ContextName, options))
                 continue;
@@ -226,6 +206,12 @@ public class TranslationState : IDisposable
                 var text = record.Text;
                 if (record.ContextName == "INFO" && record.Type == TextType.Text)
                     text = Helpers.ReplacePseudoAsterisks(text, true);
+
+                if (record.MaxLength > 0 && text.Length > record.MaxLength)
+                {
+                    throw new Exception(
+                        $"Text exceeds max length ({record.MaxLength}) for id: '{record.ContextId}', context: '{record.ContextName}': '{text}'");
+                }
 
                 Imports.TranslationRecord_SetTarget(record.Pointer, text);
             }

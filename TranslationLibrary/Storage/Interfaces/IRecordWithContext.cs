@@ -1,6 +1,6 @@
 ﻿namespace TranslationLibrary.Storage.Interfaces;
 
-public interface IRecordWithContext<ContextType>
+public interface IRecordWithContext<T>
 {
-    public ContextType ContextName { get; set; }
+    public T GetContext();
 }

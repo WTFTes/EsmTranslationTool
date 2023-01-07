@@ -5,15 +5,17 @@ using TranslationLibrary.Enums;
 
 namespace TranslationLibrary.Glossary
 {
-    public class GlossaryRecord : EntityRecord
+    public class GlossaryRecord : TextRecord
     {
         public MatchType MatchType { get; set; }
+        
+        public string OriginalText { get; set; }
 
         public override JsonObject FormatForDump(DumpFlags optionsFlags)
         {
             return new JsonObject(new List<KeyValuePair<string, JsonNode?>>()
             {
-                new("id", GetUniqId()),
+                new("id", ContextId),
                 new("source", OriginalText),
                 new("target", Text),
                 new("type", Type.ToString()),

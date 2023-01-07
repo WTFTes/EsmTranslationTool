@@ -25,7 +25,7 @@ public class GlossaryBuilderOld
     //
     // private string GetGlossaryKey(TranslationRecord record)
     // {
-    //     return $"{record.GetUniqId()}_{record.Index}";
+    //     return $"{record.ContextId}_{record.Index}";
     // }
     //
     // public void AddSources(TranslationState state) => AddToStore(_sourceStore, state);

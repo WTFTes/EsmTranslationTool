@@ -1,6 +1,6 @@
 ﻿namespace TranslationLibrary.Storage.Interfaces;
 
-public interface IRecordWithId<IdType>
+public interface IRecordWithId<T>
 {
-    public IdType Id { get; set; }
+    public T GetId();
 }

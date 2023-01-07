@@ -1,60 +1,54 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Linq;
 using TranslationLibrary.Enums;
 using TranslationLibrary.Storage.Interfaces;
 
 namespace TranslationLibrary.Storage;
 
-public class StorageById<IdType, IdGetter, RecordType> : IStorage<RecordType> where IdGetter: IIdGetter<IdType>, new()
+public class StorageById<TId, TRecord> : AbstractStorage<TRecord>
+    where TRecord: IRecordWithId<TId>
 {
-    protected readonly IdGetter _getterInstance;
-    
-    public Dictionary<IdType, RecordType> RecordsById { get; } = new();
+    public Dictionary<TId, TRecord> RecordsById { get; } = new();
 
-    public StorageById()
-    {
-        _getterInstance = new IdGetter();
-    }
+    public override IEnumerable<TRecord> Records => this.AsEnumerable();
 
-    public virtual void Add(RecordType record, MergeMode mode = MergeMode.Full)
+    public override void Add(TRecord record, MergeMode mode = MergeMode.Full)
     {
         if (mode == MergeMode.None)
             mode = MergeMode.Full;
 
-        var id = _getterInstance.Get(record);
-        if (mode.HasFlag(MergeMode.Full) || mode.HasFlag(MergeMode.Missing) && !RecordsById.ContainsKey(id))
+        if (mode.HasFlag(MergeMode.Full) || mode.HasFlag(MergeMode.Missing) && !RecordsById.ContainsKey(record.GetId()))
         {
-            RecordsById[id] = record;
-            return;
+            RecordsById[record.GetId()] = record;
         }
     }
 
-    public int Size => RecordsById.Count;
-    public bool IsEmpty => RecordsById.Count == 0;
+    public override int Size => RecordsById.Count;
 
-    public virtual void Clear()
+    public override void Clear()
     {
         RecordsById.Clear();
     }
 
-    public RecordType? LookupRecord(RecordType record)
+    public override void Merge(AbstractStorage<TRecord> other, MergeMode mode = MergeMode.Full)
     {
-        return LookupRecord(_getterInstance.Get(record));
+        foreach (var record in other)
+            Add(record, mode);
     }
 
-    public RecordType? LookupRecord(IdType id)
+    public override TRecord? LookupRecord(TRecord record)
+    {
+        return LookupRecord(record.GetId());
+    }
+
+    public TRecord? LookupRecord(TId id)
     {
         return RecordsById.GetValueOrDefault(id);
     }
 
-    public IEnumerator<RecordType> GetEnumerator()
+    public override IEnumerator<TRecord> GetEnumerator()
     {
         foreach (var (_, record) in RecordsById)
             yield return record;
-    }
-
-    IEnumerator IEnumerable.GetEnumerator()
-    {
-        return GetEnumerator();
     }
 }

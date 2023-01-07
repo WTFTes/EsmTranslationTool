@@ -4,6 +4,7 @@ using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using TranslationLibrary.Localization;
+using TranslationLibrary.Storage;
 using TranslationLibrary.Translation;
 
 namespace TranslationLibrary.Dialogue
@@ -31,11 +32,11 @@ namespace TranslationLibrary.Dialogue
 
         public static Dictionary<string, StringWithHash> CollectDialogueTopics(TranslationState state)
         {
-            var topics = state.RecordsByContextAndId.GetValueOrDefault("DIAL");
+            var topics = state.Storage.LookupContext("DIAL");
             if (topics == null)
                 return new();
 
-            return topics.Select(_ => new StringWithHash() { Value = _.Value.Text }).DistinctBy(_ => _.Value)
+            return topics.Select(_ => new StringWithHash() { Value = _.Text }).DistinctBy(_ => _.Value)
                 .OrderByDescending(_ => _.Value.Length)
                 .ToDictionary(_ => _.Value);
         }
@@ -72,7 +73,7 @@ namespace TranslationLibrary.Dialogue
                 .Where(_ => !string.IsNullOrEmpty(_)).Select(_ => new StringWithHash() { Value = _ });
         }
 
-        public void Analyze<T>(RecordStorage<T> storage, LocalizationStore localizations) where T : EntityRecord
+        public void Analyze<T>(TextStorage<T> storage, LocalizationStorage localizations) where T : TextRecord, new()
         {
             var hyperlinkTopics = CollectHyperlinks(storage);
 
@@ -101,7 +102,7 @@ namespace TranslationLibrary.Dialogue
             }
         }
 
-        private string CheckKnownTopicOrPhraseForm(string topic, LocalizationStore localizations)
+        private string CheckKnownTopicOrPhraseForm(string topic, LocalizationStorage localizations)
         {
             if (Dialogues.ContainsKey(topic))
                 return "";
@@ -113,18 +114,18 @@ namespace TranslationLibrary.Dialogue
             return $"'{topic}' is not a known dialogues or phraseform";
         }
 
-        private Dictionary<string, List<string>> CollectHyperlinks<T>(RecordStorage<T> storage) where T : EntityRecord
+        private Dictionary<string, List<string>> CollectHyperlinks<T>(TextStorage<T> storage) where T : TextRecord, new()
         {
-            var infos = storage.RecordsByContextAndId.GetValueOrDefault("INFO");
+            var infos = storage.LookupContext("INFO");
             if (infos == null)
                 return new();
 
             Dictionary<string, List<string>> result = new();
-            foreach (var (id, info) in infos)
+            foreach (var info in infos)
             {
                 var matches = Regex.Matches(info.Text, "@([^#])#", RegexOptions.IgnoreCase);
 
-                result[id].AddRange(matches.Select(_ => _.Groups[1].Value));
+                result[info.ContextId].AddRange(matches.Select(_ => _.Groups[1].Value));
             }
 
             return result;

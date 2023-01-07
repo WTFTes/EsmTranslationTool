@@ -1,68 +1,96 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
+using System.Linq;
 using TranslationLibrary.Enums;
 using TranslationLibrary.Storage.Interfaces;
 
 namespace TranslationLibrary.Storage;
 
-public class StorageByContext<ContextType, ContextGetter, IdType, IdGetter, RecordType> :
-    IStorage<RecordType>
-    where IdGetter: IIdGetter<IdType>, new()
-    where ContextGetter: IIdGetter<ContextType>, new()
+public class StorageByContext<TContext, TId, TRecord> :
+    AbstractStorage<TRecord>
+    where TRecord : IRecordWithContext<TContext>, IRecordWithId<TId>
 {
-    private readonly ContextGetter _getterInstance;
-    
-    public StorageById<ContextType, ContextGetter, StorageById<IdType, IdGetter, RecordType>> RecordsByContext { get; } = new();
-
-    public StorageByContext()
+    public class ContextIdStorageWrapper : StorageById<TId, TRecord>, IRecordWithId<TContext>
     {
-        _getterInstance = new ContextGetter();
+        private readonly TContext _contextId;
+
+        public ContextIdStorageWrapper(TContext contextId)
+        {
+            _contextId = contextId;
+        }
+
+        public TContext GetId()
+        {
+            return _contextId;
+        }
+    }
+    
+    private readonly StorageById<TContext, ContextIdStorageWrapper> _storage =
+        new();
+
+    public override IEnumerable<TRecord> Records
+    {
+        get { return _storage.SelectMany(byId => byId); }
     }
 
-    public void Add(RecordType record, MergeMode mode = MergeMode.Full)
+    public override int Size => _storage.Sum(_ => _.Size);
+
+    public IEnumerable<KeyValuePair<TContext, ContextIdStorageWrapper>>
+        RecordsByContext =>
+        _storage.RecordsById;
+
+    public override void Add(TRecord record, MergeMode mode = MergeMode.Full)
     {
         if (mode == MergeMode.None)
             mode = MergeMode.Full;
 
-        var byId = RecordsByContext.RecordsById.GetOrCreate(_getterInstance.Get(record));
-        byId.Add(record, mode);
+        var byId = _storage.LookupRecord(record.GetContext());
+        if (byId != null)
+        {
+            byId.Add(record, mode);
+            return;
+        }
+
+        _storage.Add(new ContextIdStorageWrapper(record.GetContext()) { { record, mode } });
     }
 
-    public void Clear()
+    public override TRecord? LookupRecord(TRecord record)
     {
-        foreach (var byId in RecordsByContext)
-            byId.Clear();
-        
-        RecordsByContext.Clear();
-    }
-
-    public RecordType? LookupRecord(RecordType record)
-    {
-        var byId = RecordsByContext.LookupRecord(_getterInstance.Get(record));
+        var byId = _storage.LookupRecord(record.GetContext());
         if (byId == null)
             return default;
 
         return byId.LookupRecord(record);
     }
-    
-    public RecordType? LookupRecord(ContextType contextName, IdType contextId)
+
+    public StorageById<TId, TRecord>? LookupContext(TContext contextId)
     {
-        var byId = RecordsByContext.LookupRecord(contextName);
+        return _storage.LookupRecord(contextId);
+    }
+
+    public override void Clear()
+    {
+        _storage.Clear();
+    }
+
+    public override void Merge(AbstractStorage<TRecord> other, MergeMode mode = MergeMode.Full)
+    {
+        foreach (var record in other.Records)
+            Add(record, mode);
+    }
+
+    public TRecord? LookupRecord(TContext contextName, TId contextId)
+    {
+        var byId = _storage.LookupRecord(contextName);
         if (byId == null)
             return default;
 
         return byId.LookupRecord(contextId);
     }
 
-    public IEnumerator<RecordType> GetEnumerator()
+    public override IEnumerator<TRecord> GetEnumerator()
     {
-        foreach (var byId in RecordsByContext)
-        foreach (var record in byId)
+        foreach (var byContext in _storage)
+        foreach (var record in byContext)
             yield return record;
-    }
-
-    IEnumerator IEnumerable.GetEnumerator()
-    {
-        return GetEnumerator();
     }
 }

@@ -3,6 +3,7 @@ using System.Text.RegularExpressions;
 using TranslationLibrary;
 using TranslationLibrary.Enums;
 using TranslationLibrary.Glossary;
+using TranslationLibrary.Storage;
 using TranslationLibrary.Translation;
 
 namespace TranslationTool.Commands;
@@ -35,10 +36,10 @@ public static class Extract
             GlossaryBuilder glossary = new();
             foreach (var glossaryPath in parameters.GlossaryDirectories)
             {
-                RecordStorage<GlossaryRecord> storage;
+                GlossaryStorage storage = new();
                 try
                 {
-                    storage = Dump.LoadKeyed<GlossaryRecord>(glossaryPath);
+                    storage.LoadKeyed(glossaryPath);
                 }
                 catch (Exception e)
                 {
@@ -46,11 +47,11 @@ public static class Extract
                 }
 
                 glossary.Storage.Merge(storage, MergeMode.Full);
-                console.WriteLine($"Loaded {storage.Records.Count} entries from glossary at '{glossaryPath}'");
+                console.WriteLine($"Loaded {storage.Size} entries from glossary at '{glossaryPath}'");
             }
 
             if (parameters.GlossaryDirectories.Length > 0)
-                console.WriteLine($"Total glossary records: {glossary.Storage.Records.Count}");
+                console.WriteLine($"Total glossary records: {glossary.Storage.Size}");
 
             var flags = DumpFlags.SkipTranslated;
             if (parameters.MarkTopics)
@@ -98,8 +99,8 @@ public static class Extract
                 {
                     console.WriteLine($"Loading '{Path.GetFileName(esm)}'...");
                     state.Load(esm, parameters.Encoding);
-                    console.WriteLine($"Loaded {state.Storage.Records.Count} texts from '{Path.GetFileName(esm)}'");
-                    totalRecords += state.Storage.Records.Count;
+                    console.WriteLine($"Loaded {state.Storage.Size} texts from '{Path.GetFileName(esm)}'");
+                    totalRecords += state.Storage.Size;
                 }
                 catch (Exception e)
                 {
@@ -128,7 +129,7 @@ public static class Extract
                     console.WriteLine($"Extracting texts from '{Path.GetFileName(esm)}' to '{parameters.OutputPath}'...");
                     try
                     {
-                        var stats = Dump.DumpStore(dumpPath, state.Storage, Path.GetFileNameWithoutExtension(esm),
+                        var stats = state.Storage.DumpStore(dumpPath, Path.GetFileNameWithoutExtension(esm),
                             options);
 
                         console.WriteLine($"Extracted for '{Path.GetFileName(esm)}' - {StatsAsString(stats)}");
@@ -147,13 +148,12 @@ public static class Extract
                     Directory.CreateDirectory(dumpPath);
 
                 if (parameters.InputEsms.Length > 1)
-                    console.WriteLine($"{totalRecords} texts merged to {mergedState.Records.Count}");
+                    console.WriteLine($"{totalRecords} texts merged to {mergedState.Storage.Size}");
 
                 console.WriteLine($"Extracting texts to '{parameters.OutputPath}'...");
                 try
                 {
-                    var stats = Dump.DumpStore(dumpPath, mergedState.Storage, "",
-                        options);
+                    var stats = mergedState.Storage.DumpStore(dumpPath, "", options);
                     console.WriteLine($"Extracted - {StatsAsString(stats)}");
                 }
                 catch (Exception e)
@@ -174,7 +174,7 @@ public static class Extract
         }
     }
 
-    private static string StatsAsString(Dictionary<string, Dump.DumpInfo> stats)
+    private static string StatsAsString(Dictionary<string, TextStorage<TranslationRecord>.DumpInfo> stats)
     {
         var byContext = string.Join(", ", stats
             //.Select(_ => new KeyValuePair<string, Dump.DumpInfo>(_.Key, _.Value))

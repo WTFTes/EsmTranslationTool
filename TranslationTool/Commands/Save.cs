@@ -1,7 +1,7 @@
 ﻿using System.CommandLine;
-using TranslationLibrary;
 using TranslationLibrary.Enums;
 using TranslationLibrary.Glossary;
+using TranslationLibrary.Storage;
 using TranslationLibrary.Translation;
 
 namespace TranslationTool.Commands;
@@ -24,20 +24,20 @@ public class Save
         try
         {
             GlossaryBuilder glossary = new();
-            var translations = Dump.LoadKeyed<EntityRecord>(parameters.TranslationsPath);
+            TextStorage<TranslationRecord> translations = new();
+            translations.LoadKeyed(parameters.TranslationsPath);
 
             foreach (var glossaryPath in parameters.GlossaryDirectories)
             {
-                var storage = Dump.LoadKeyed<GlossaryRecord>(glossaryPath);
-                glossary.Storage.Merge(storage, MergeMode.Full);
-                console.WriteLine($"Loaded {storage.Records.Count} entries from glossary at '{glossaryPath}'");
+                glossary.Storage.LoadKeyed(glossaryPath);
+                console.WriteLine($"Loaded {glossary.Storage.Size} entries from glossary at '{glossaryPath}'");
             }
 
             if (parameters.GlossaryDirectories.Length > 0)
-                console.WriteLine($"Total glossary records: {glossary.Storage.Records.Count}");
+                console.WriteLine($"Total glossary records: {glossary.Storage.Size}");
 
-            console.WriteLine($"Loaded {translations.Records.Count} translation texts");
-            if (translations.Records.Count == 0)
+            console.WriteLine($"Loaded {translations.Size} translation texts");
+            if (translations.Size == 0)
             {
                 Console.WriteLine();
                 return;
@@ -60,7 +60,7 @@ public class Save
                     throw new Exception($"Failed to load {Path.GetFileName(esm)}: {e.Message}");
                 }
 
-                Dictionary<string, RecordStorage<TranslationRecord>.MergedInfo> info;
+                Dictionary<string, TextStorage<TranslationRecord>.MergedInfo> info;
                 if (!glossary.Storage.Empty)
                 {
                     console.WriteLine("Merging glossary...");

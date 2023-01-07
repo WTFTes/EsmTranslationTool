@@ -9,13 +9,14 @@ public class Imports
     public struct TranslationRecordInfo
     {
         public IntPtr Pointer;
-        public int Index;
-        public int Type;
         public IntPtr SourcePtr;
         public IntPtr TargetPtr;
         public IntPtr ContextNamePtr;
         public IntPtr ContextIdPtr;
         public IntPtr MetaPtr;
+        public int Index;
+        public int Type;
+        public int MaxLength;
 
         public string Source => Marshal.PtrToStringUTF8(SourcePtr) ?? "";
         public string Target => Marshal.PtrToStringUTF8(TargetPtr) ?? "";

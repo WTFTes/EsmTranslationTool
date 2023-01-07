@@ -6,18 +6,50 @@ using System.Text.Json;
 using System.Text.Json.Nodes;
 using TranslationLibrary.Enums;
 
-namespace TranslationLibrary;
+namespace TranslationLibrary.Storage;
 
-public static class Dump
+public class TextStorage<TRecord> : StorageByContext<string, string, TRecord>
+    where TRecord : TextRecord, new()
 {
+    public class MergedInfo
+    {
+        public int Total = 0;
+        public int Matched = 0;
+        public int NotMatched = 0;
+    }
+
+    /// <summary>
+    /// Merges all text from storage to source
+    /// </summary>
+    /// <param name="other"></param>
+    /// <typeparam name="TV"></typeparam>
+    /// <returns></returns>
+    public Dictionary<string, MergedInfo> MergeTexts<TV>(TextStorage<TV> other) where TV : TextRecord, new()
+    {
+        Dictionary<string, MergedInfo> result = new();
+        foreach (var record in other.Records)
+        {
+            ++result.GetOrCreate(record.ContextName).Total;
+
+            var origRecord = LookupRecord(record.ContextName, record.ContextId);
+            if (origRecord == null)
+                continue;
+
+            origRecord.Text = record.Text;
+            ++result.GetOrCreate(record.ContextName).Matched;
+        }
+
+        return result;
+    }
+
     public class DumpInfo
     {
-        public int Skipped = 0;         
+        public int Skipped = 0;
         public int Total = 0;
     }
-    
-    public static Dictionary<string, DumpInfo> DumpStore<T>(string path, RecordStorage<T> storage, string sourceContext,
-        DumpOptions options) where T : EntityRecord
+
+
+    public Dictionary<string, DumpInfo> DumpStore(string path, string sourceContext, DumpOptions options)
     {
         if (!Directory.Exists(path))
             throw new Exception($"Directory '{path}' does not exist");
@@ -28,40 +60,40 @@ public static class Dump
 
         Dictionary<string, int> recordsPerSubcontext = new();
 
-        foreach (var (contextName, byContext) in storage.RecordsByContextAndId)
+        foreach (var (contextName, byContext) in RecordsByContext)
         {
-            stats.GetOrCreate(contextName).Total = byContext.Count;
-            foreach (var (_, record) in byContext)
+            stats.GetOrCreate(contextName).Total = byContext.Size;
+            foreach (var (_, record) in byContext.RecordsById)
             {
                 if (record.IsIgnoredForDump(options))
                 {
-                    ++stats.GetOrCreate(record.ContextName).Skipped;
+                    ++stats.GetOrCreate(contextName).Skipped;
                     continue;
                 }
 
                 var contextPart = !options.HasFlag(DumpFlags.SkipFileContextLevel) ? sourceContext : "";
-                var recordDir = Path.Combine(path, contextPart, record.ContextName);
+                var recordDir = Path.Combine(path, contextPart, contextName.ToString());
 
-                if (!createdDirectoriesByType.Contains(record.ContextName))
+                if (!createdDirectoriesByType.Contains(contextName.ToString()))
                 {
                     if (!Directory.Exists(recordDir))
                         Directory.CreateDirectory(recordDir);
 
-                    createdDirectoriesByType.Add(record.ContextName);
+                    createdDirectoriesByType.Add(contextName.ToString());
                 }
 
                 var overrideType = record.Type;
                 if (options.HasFlag(DumpFlags.AllToJson))
                     overrideType = TextType.Text;
-                    
+
                 switch (overrideType)
                 {
                     case TextType.Script:
-                        File.WriteAllText(Path.Combine(recordDir, record.GetUniqId()) + ".mwscript",
+                        File.WriteAllText(Path.Combine(recordDir, record.ContextId) + ".mwscript",
                             record.Text);
                         break;
                     case TextType.Html:
-                        File.WriteAllText(Path.Combine(recordDir, record.GetUniqId()) + ".mwbook",
+                        File.WriteAllText(Path.Combine(recordDir, record.ContextId) + ".mwbook",
                             record.Text);
                         break;
                     case TextType.Text:
@@ -75,14 +107,15 @@ public static class Dump
                             if (!string.IsNullOrEmpty(subContext))
                                 subContext += "_";
 
-                            var offset = recordsPerSubcontext[counterContext] / options.RecordsPerFile; 
+                            var offset = recordsPerSubcontext[counterContext] / options.RecordsPerFile;
                             subContext +=
                                 $"{offset * options.RecordsPerFile + 1}-{(offset + 1) * options.RecordsPerFile}";
 
                             ++recordsPerSubcontext[counterContext];
                         }
 
-                        textsByContextAndSubcontext.GetOrCreate(record.ContextName).GetOrCreate(subContext).Add(record.FormatForDump(options.Flags));
+                        textsByContextAndSubcontext.GetOrCreate(record.ContextName).GetOrCreate(subContext)
+                            .Add(record.FormatForDump(options.Flags));
                         break;
                     default:
                         throw new Exception($"Unknown record text type '{record.Type}'");
@@ -113,38 +146,36 @@ public static class Dump
 
         return stats;
     }
-
-    public static RecordStorage<T> LoadKeyed<T>(string path) where T : EntityRecord, new()
+    
+    public void LoadKeyed(string path, MergeMode mode = MergeMode.Full)
     {
         if (!Directory.Exists(path))
             throw new Exception($"Path '{path}' does not exist");
 
-        var storage = new RecordStorage<T>();
+        var storage = new TextStorage<TRecord>();
         var contextDirectories = Directory.GetDirectories(path);
         foreach (var contextDirectory in contextDirectories)
         {
             var files = Directory.GetFiles(contextDirectory);
             foreach (var file in files)
             {
-                var records = LoadFile<T>(file, Path.GetFileNameWithoutExtension(contextDirectory));
+                var records = LoadFile(file, Path.GetFileNameWithoutExtension(contextDirectory));
                 foreach (var record in records)
-                    storage.Add(record);
+                    Add(record, mode);
             }
         }
-
-        return storage;
     }
 
-    private static List<T> LoadFile<T>(string path, string contextName) where T : EntityRecord, new()
+    private static List<TRecord> LoadFile(string path, string contextName)
     {
         var extension = Path.GetExtension(path);
 
-        List<T> records = new();
+        List<TRecord> records = new();
         switch (extension)
         {
             case ".mwscript":
             {
-                var record = new T();
+                var record = new TRecord();
                 record.ContextName = contextName;
                 record.ContextId = Path.GetFileNameWithoutExtension(path);
                 record.Text = File.ReadAllText(path);
@@ -155,7 +186,7 @@ public static class Dump
             }
             case ".mwbook":
             {
-                var record = new T();
+                var record = new TRecord();
                 record.ContextName = contextName;
                 record.ContextId = Path.GetFileNameWithoutExtension(path);
                 record.Text = File.ReadAllText(path);
@@ -179,7 +210,7 @@ public static class Dump
 
                 foreach (var obj in json.AsArray())
                 {
-                    var record = new T
+                    var record = new TRecord
                     {
                         ContextName = contextName,
                         Type = TextType.Text

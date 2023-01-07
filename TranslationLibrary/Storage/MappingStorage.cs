@@ -3,31 +3,49 @@ using TranslationLibrary.Storage.Interfaces;
 
 namespace TranslationLibrary.Storage;
 
-public class MappingStorage<IdType, IdGetter, SecondaryIdType, SecondaryIdGetter, RecordType> : StorageById<IdType, IdGetter, RecordType>
-    where IdGetter : IIdGetter<IdType>, new()
-    where SecondaryIdGetter : IIdGetter<SecondaryIdType>, new()
+public class MappingStorage<TSource, TTarget, TRecord> : StorageById<TSource, TRecord>
+    where TRecord : IRecordWithId<TSource>, IRecordWithSecondaryId<TTarget>
 {
-    public StorageById<SecondaryIdType, SecondaryIdGetter, RecordType> RecordsBySecondaryId { get; } = new();
-
-    public override void Add(RecordType record, MergeMode mode = MergeMode.Full)
+    private class SecondaryIdWrapper : IRecordWithId<TTarget>
     {
-        RecordsBySecondaryId.Add(record, mode);
+        public TRecord Content { get; }
+
+        public SecondaryIdWrapper(TRecord content)
+        {
+            Content = content;
+        }
+
+        public TTarget GetId()
+        {
+            return Content.GetSecondaryId();
+        }
+    }
+    
+    private readonly StorageById<TTarget, SecondaryIdWrapper> _recordsBySecondaryId = new();
+
+    public override void Add(TRecord record, MergeMode mode = MergeMode.Full)
+    {
+        _recordsBySecondaryId.Add(new SecondaryIdWrapper(record), mode);
         base.Add(record, mode);
     }
 
     public override void Clear()
     {
-        RecordsById.Clear();
-        RecordsBySecondaryId.Clear();
+        base.Clear();
+        _recordsBySecondaryId.Clear();
     }
 
-    public RecordType? LookupRecordByTarget(RecordType record)
+    public TRecord? LookupRecordByTarget(TRecord record)
     {
-        return RecordsBySecondaryId.LookupRecord(record);
+        var result = _recordsBySecondaryId.LookupRecord(new SecondaryIdWrapper(record));
+
+        return result != null ? result.Content : default;
     }
 
-    public RecordType? LookupRecordByTarget(SecondaryIdType id)
+    public TRecord? LookupRecordByTarget(TTarget id)
     {
-        return RecordsBySecondaryId.LookupRecord(id);
+        var result = _recordsBySecondaryId.LookupRecord(id);
+
+        return result != null ? result.Content : default;
     }
 }

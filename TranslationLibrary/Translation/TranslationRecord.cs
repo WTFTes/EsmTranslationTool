@@ -6,11 +6,13 @@ using TranslationLibrary.Enums;
 
 namespace TranslationLibrary.Translation;
 
-public class TranslationRecord : EntityRecord
+public class TranslationRecord : TextRecord
 {
     public string UnprocessedOriginalText { get; set; } = "";
     
     public string OriginalText { get; set; } = "";
+    
+    public int MaxLength { get; set; }
 
     public JsonNode? Meta { get; set; }
 
@@ -42,12 +44,30 @@ public class TranslationRecord : EntityRecord
         return base.IsIgnoredForDump(options);
     }
 
+    protected override string GetTextForDump(DumpOptions options) => options.HasFlag(DumpFlags.TranslatedText) ? Text : OriginalText;
+
+    public override JsonObject FormatForDump(DumpFlags optionsFlags)
+    {
+        var text = optionsFlags.HasFlag(DumpFlags.TranslatedText) ? Text : OriginalText;
+
+        return new JsonObject(new List<KeyValuePair<string, JsonNode?>>() { new(ContextId, text) });;
+    }
+    
+    public override void FromDump(JsonObject obj)
+    {
+        foreach (var p in obj)
+        {
+            ContextId = p.Key;
+            Text = p.Value.ToString();
+        }
+    }
+
     [JsonIgnore]
     public IntPtr Pointer { get; set; } = IntPtr.Zero;
 
     public bool IsTranslated => Helpers.StripHyperlinks(Text) != Helpers.StripHyperlinks(UnprocessedOriginalText);
 
-    // public override string GetUniqId()
+    // public override string ContextId
     // {
     //     return !string.IsNullOrEmpty(ContextId) ? $"{ContextId}_{Index}" : $"{OriginalText}_{Index}";
     // }

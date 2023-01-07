@@ -42,15 +42,15 @@ public static class BuildGlossary
 
                 builder.Build(origState, localizedState);
                 console.WriteLine(
-                    $"Generated {builder.Storage.Records.Count - recordsCount} records from original {Path.GetFileName(parameters.OriginalEsms[i])} and localized {Path.GetFileName(parameters.LocalizedEsms[i])}");
-                recordsCount = builder.Storage.Records.Count;
+                    $"Generated {builder.Storage.Size - recordsCount} records from original {Path.GetFileName(parameters.OriginalEsms[i])} and localized {Path.GetFileName(parameters.LocalizedEsms[i])}");
+                recordsCount = builder.Storage.Size;
             }
 
             if (!Directory.Exists(parameters.OutputPath))
                 Directory.CreateDirectory(parameters.OutputPath);
 
-            console.WriteLine($"Dumping total {builder.Storage.Records.Count} records to {parameters.OutputPath}");
-            Dump.DumpStore(parameters.OutputPath, builder.Storage, "",
+            console.WriteLine($"Dumping total {builder.Storage.Size} records to {parameters.OutputPath}");
+            builder.Storage.DumpStore(parameters.OutputPath, "",
                 new() { Flags = dumpFlags });
             console.WriteLine("Done");
         }

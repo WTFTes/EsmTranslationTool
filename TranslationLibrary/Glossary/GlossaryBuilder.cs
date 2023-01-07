@@ -2,18 +2,15 @@
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
 using TranslationLibrary.Enums;
-using TranslationLibrary.Localization;
+using TranslationLibrary.Storage;
 using TranslationLibrary.Translation;
 
 namespace TranslationLibrary.Glossary
 {
     public class GlossaryBuilder
     {
-        private RecordStorage<GlossaryRecord> _storage = new();
-
-        public RecordStorage<GlossaryRecord> Storage => _storage;
+        public GlossaryStorage Storage { get; } = new();
 
         public void Build(TranslationState original, TranslationState localized, BuildMode mode = BuildMode.Merge)
         {
@@ -33,12 +30,12 @@ namespace TranslationLibrary.Glossary
             Dictionary<string, Dictionary<string, TranslationRecord>> originalInfosByDialogue = new();
             Dictionary<string, Dictionary<string, TranslationRecord>> localizedInfosByDialogue = new();
 
-            var originalInfos = original.RecordsByContextAndId.GetValueOrDefault("INFO");
-            var localizedInfos = localized.RecordsByContextAndId.GetValueOrDefault("INFO");
+            var originalInfos = original.Storage.LookupContext("INFO");
+            var localizedInfos = localized.Storage.LookupContext("INFO");
 
             if (originalInfos != null)
             {
-                foreach (var (_, info) in originalInfos)
+                foreach (var info in originalInfos)
                 {
                     if (info.Type != TextType.Text)
                         continue;
@@ -50,7 +47,7 @@ namespace TranslationLibrary.Glossary
 
             if (localizedInfos != null)
             {
-                foreach (var (_, info) in localizedInfos)
+                foreach (var info in localizedInfos)
                 {
                     if (info.Type != TextType.Text)
                         continue;
@@ -60,38 +57,35 @@ namespace TranslationLibrary.Glossary
                 }
             }
 
-            foreach (var (_, byContext) in original.RecordsByContextAndId)
+            foreach (var record in original.Storage)
             {
-                foreach (var (_, record) in byContext)
+                var loc = localized.Storage.LookupRecord(record);
+                if (loc == null)
+                    continue;
+
+                if (loc.Text == record.Text)
+                    continue;
+
+                Storage.Add(new GlossaryRecord()
                 {
-                    var loc = localized.Storage.LookupRecord(record);
-                    if (loc == null)
-                        continue;
-
-                    if (loc.Text == record.Text)
-                        continue;
-
-                    _storage.Add(new GlossaryRecord()
-                    {
-                        ContextId = loc.GetUniqId(),
-                        ContextName = loc.ContextName,
-                        MatchType = MatchType.Full,
-                        Text = loc.OriginalText,
-                        OriginalText = record.OriginalText,
-                        SubContext = record.SubContext,
-                    });
-                }
+                    ContextId = loc.ContextId,
+                    ContextName = loc.ContextName,
+                    MatchType = MatchType.Full,
+                    Text = loc.OriginalText,
+                    OriginalText = record.OriginalText,
+                    SubContext = record.SubContext,
+                });
             }
         }
 
         private void BuildNpcMatches(TranslationState original, TranslationState localized,
             BuildMode mode = BuildMode.Merge)
         {
-            var npcs = original.RecordsByContextAndId.GetValueOrDefault("NPC_");
+            var npcs = original.Storage.LookupContext("NPC_");
             if (npcs == null)
                 return;
 
-            foreach (var (_, record) in npcs)
+            foreach (var record in npcs)
             {
                 var loc = localized.Storage.LookupRecord(record);
                 if (loc == null)
@@ -120,9 +114,9 @@ namespace TranslationLibrary.Glossary
                 {
                     for (var i = 0; i < localizedParts1.Length; ++i)
                     {
-                        _storage.Add(new GlossaryRecord()
+                        Storage.Add(new GlossaryRecord()
                         {
-                            ContextId = original.GetUniqId(),
+                            ContextId = original.ContextId,
                             ContextName = original.ContextName,
                             MatchType = MatchType.Partial,
                             Text = localizedParts1[i],
@@ -144,9 +138,9 @@ namespace TranslationLibrary.Glossary
             if (localizedParts2.Length == originalParts2.Length && localizedParts2.Length > 1)
             {
                 for (var i = 0; i < localizedParts2.Length; ++i)
-                    _storage.Add(new GlossaryRecord()
+                    Storage.Add(new GlossaryRecord()
                     {
-                        ContextId = $"{original.GetUniqId()}_partial_{i}",
+                        ContextId = $"{original.ContextId}_partial_{i}",
                         ContextName = original.ContextName,
                         MatchType = MatchType.Partial,
                         Text = localizedParts2[i],
