@@ -1,6 +1,5 @@
 ﻿using System.CommandLine;
 using System.Text.RegularExpressions;
-using TranslationLibrary;
 using TranslationLibrary.Enums;
 using TranslationLibrary.Glossary;
 using TranslationLibrary.Storage;
@@ -30,16 +29,16 @@ public static class Extract
 {
     public static void Run(ExtractParameters parameters, IConsole console)
     {
-        var mergedState = new TranslationState();
         try
         {
+            var mergedState = new TranslationState();
             GlossaryBuilder glossary = new();
             foreach (var glossaryPath in parameters.GlossaryDirectories)
             {
                 GlossaryStorage storage = new();
                 try
                 {
-                    storage.LoadKeyed(glossaryPath);
+                    storage.Load(glossaryPath);
                 }
                 catch (Exception e)
                 {
@@ -122,7 +121,7 @@ public static class Extract
                     mergedState.Merge(state);
                 else
                 {
-                    var dumpPath = Path.Combine(parameters.OutputPath);
+                    var dumpPath =parameters.OutputPath;
                     if (!Directory.Exists(dumpPath))
                         Directory.CreateDirectory(dumpPath);
 
@@ -136,14 +135,14 @@ public static class Extract
                     }
                     catch (Exception e)
                     {
-                        console.WriteLine($"Failed to extract texts: {e.Message}");
+                        throw new Exception($"Failed to extract texts: {e.Message}");
                     }
                 }
             }
 
             if (!parameters.NoMerge)
             {
-                var dumpPath = Path.Combine(parameters.OutputPath);
+                var dumpPath = parameters.OutputPath;
                 if (!Directory.Exists(dumpPath))
                     Directory.CreateDirectory(dumpPath);
 
@@ -158,7 +157,7 @@ public static class Extract
                 }
                 catch (Exception e)
                 {
-                    console.WriteLine($"Failed to extract texts: {e.Message}");
+                    throw new Exception($"Failed to extract texts: {e.Message}");
                 }
             }
 
@@ -167,10 +166,6 @@ public static class Extract
         catch (Exception e)
         {
             console.WriteLine($"Error: {e.Message}");
-        }
-        finally
-        {
-            mergedState.Dispose();
         }
     }
 

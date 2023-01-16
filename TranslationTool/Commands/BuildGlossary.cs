@@ -1,5 +1,4 @@
 ﻿using System.CommandLine;
-using TranslationLibrary;
 using TranslationLibrary.Enums;
 using TranslationLibrary.Glossary;
 using TranslationLibrary.Translation;
@@ -14,6 +13,7 @@ public class BuildGlossaryParameters
     public string LocalizedEncoding { get; set; }
     public string OutputPath { get; set; }
     public bool MarkTopics { get; set; }
+    public bool Plain { get; set; }
 }
 
 public static class BuildGlossary
@@ -50,8 +50,12 @@ public static class BuildGlossary
                 Directory.CreateDirectory(parameters.OutputPath);
 
             console.WriteLine($"Dumping total {builder.Storage.Size} records to {parameters.OutputPath}");
-            builder.Storage.DumpStore(parameters.OutputPath, "",
-                new() { Flags = dumpFlags });
+            if (parameters.Plain)
+                builder.Storage.DumpCsv(Path.Combine(parameters.OutputPath, "glossary.csv"));
+            else
+                builder.Storage.DumpStore(parameters.OutputPath, "",
+                    new() { Flags = dumpFlags });
+
             console.WriteLine("Done");
         }
         catch (Exception e)

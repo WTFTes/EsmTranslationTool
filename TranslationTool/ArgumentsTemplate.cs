@@ -1,11 +1,12 @@
 ﻿using System.CommandLine;
 using System.CommandLine.Parsing;
+using TranslationLibrary;
 
 namespace TranslationTool;
 
 public class ArgumentsTemplate
 {
-    private static readonly string[] AllowedEncodings = { "win1250", "win1251", "win1252" };
+    private static readonly string[] AllowedEncodings = { EsmEncoding.CentralOrWesternEuropean, EsmEncoding.Cyrillic, EsmEncoding.English };
     
     protected static string FormatError(string message, Argument arg)
     {
@@ -57,6 +58,25 @@ public class ArgumentsTemplate
 
         return path;
     }
+
+    protected static string ValidateInput(ArgumentResult result)
+    {
+        string path;
+        if (result.Tokens.Count == 0)
+        {
+            result.ErrorMessage = FormatError("value must be specified", result.Argument);
+            return "";
+        }
+
+        path = result.Tokens.Single().ToString();
+        if (!File.Exists(path))
+        {
+            result.ErrorMessage = FormatError($"file '{path}' does not exist", result.Argument);
+            return "";
+        }
+
+        return path;
+    }
     
     protected static string[] ValidateDirectories(ArgumentResult result)
     {
@@ -73,7 +93,7 @@ public class ArgumentsTemplate
         return strTokens;
     }
 
-    protected static string[] ValidateInput(ArgumentResult result)
+    protected static string[] ValidateInputs(ArgumentResult result)
     {
         var strTokens = result.Tokens.Select(_ => _.ToString()).ToArray();
         if (strTokens.Length == 0)

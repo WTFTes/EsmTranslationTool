@@ -10,25 +10,19 @@ namespace TranslationLibrary;
 
 public static class Helpers
 {
-    static Helpers()
-    {
-        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-    }
-
-    private static List<StringWithHash> FilterTopicsForText(string text,
-        Dictionary<string, StringWithHash> topics)
+    private static IEnumerable<StringWithHash> FilterTopicsForText(string text,
+        IEnumerable<StringWithHash> topics)
     {
         var hashes = StringWithHash.GetStringPartHashes(text);
 
-        return topics.Where(_ => _.Value.PartHashes.All(_2 => hashes.Contains(_2)))
-            .Select(_ => _.Value).ToList();
+        return topics.Where(_ => _.PartHashes.All(_2 => hashes.Contains(_2)));
     }
 
     public static string MarkupDialogues(string text, string script, out List<string> foundDialogues, DialogueHelper? helper = null)
     {
         foundDialogues = new();
         
-        List<StringWithHash> topicList;
+        IEnumerable<StringWithHash> topicList;
         if (helper == null)
         {
             if (!script.Contains("addtopic", StringComparison.InvariantCultureIgnoreCase))
@@ -66,7 +60,7 @@ public static class Helpers
         return text.Trim();
     }
 
-    public static string AppendDialogues(TranslationRecord record, string script, DialogueHelper? helper)
+    public static string AppendDialogues(TranslationRecord record, string script, DialogueHelper helper)
     {
         MarkupDialogues(record.UnprocessedOriginalText, script, out var foundDialogues, helper);
 
@@ -96,7 +90,6 @@ public static class Helpers
     // Исследовать вместе_7939321882060124566_27908313681285523350_EMPTY_1.txt	1	Choice ,"Я сделаю это.", 3, "Я не могу помочь вам.", 4
     // суджамма_12186127903207729714_1304111561233932196_3190830075182711833_1.txt	1	Choice Yes 1 No 2	
 
-
     public static bool ScriptCanBeTranslated(string script)
     {
         var lines = script.Split("\n");
@@ -113,22 +106,7 @@ public static class Helpers
 
         return false;
     }
-
-    public static Encoding EsmToSysEncoding(string encoding)
-    {
-        switch (encoding)
-        {
-            case "win1250":
-                return Encoding.GetEncoding("windows-1250");
-            case "win1251":
-                return Encoding.GetEncoding("windows-1251");
-            case "win1252":
-                return Encoding.GetEncoding("windows-1252");
-            default:
-                throw new Exception($"Unsupported encoding '{encoding}'");
-        }
-    }
-
+    
     public static string GetLastError(string context)
     {
         var lastError = Imports.Translation_GetLastError();

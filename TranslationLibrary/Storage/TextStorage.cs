@@ -1,9 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
-using System.Text.Encodings.Web;
-using System.Text.Json;
-using System.Text.Json.Nodes;
 using TranslationLibrary.Enums;
 
 namespace TranslationLibrary.Storage;
@@ -48,7 +45,6 @@ public class TextStorage<TRecord> : StorageByContext<string, string, TRecord>
         public int Total = 0;
     }
 
-
     public Dictionary<string, DumpInfo> DumpStore(string path, string sourceContext, DumpOptions options)
     {
         if (!Directory.Exists(path))
@@ -56,7 +52,7 @@ public class TextStorage<TRecord> : StorageByContext<string, string, TRecord>
 
         Dictionary<string, DumpInfo> stats = new();
         List<string> createdDirectoriesByType = new();
-        Dictionary<string, Dictionary<string, List<JsonObject>>> textsByContextAndSubcontext = new();
+        Dictionary<string, Dictionary<string, List<TRecord>>> textsByContextAndSubcontext = new();
 
         Dictionary<string, int> recordsPerSubcontext = new();
 
@@ -115,7 +111,7 @@ public class TextStorage<TRecord> : StorageByContext<string, string, TRecord>
                         }
 
                         textsByContextAndSubcontext.GetOrCreate(record.ContextName).GetOrCreate(subContext)
-                            .Add(record.FormatForDump(options.Flags));
+                            .Add(record);
                         break;
                     default:
                         throw new Exception($"Unknown record text type '{record.Type}'");
@@ -130,24 +126,18 @@ public class TextStorage<TRecord> : StorageByContext<string, string, TRecord>
                 var contextPart = !options.HasFlag(DumpFlags.SkipFileContextLevel) ? sourceContext : "";
                 var recordDir = Path.Combine(path, contextPart, contextName);
 
-                var text = JsonSerializer.Serialize(values, new JsonSerializerOptions()
-                {
-                    Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
-                    WriteIndented = true,
-                });
-
                 var suffix = subContext;
                 if (!string.IsNullOrEmpty(suffix))
                     suffix = "_" + suffix;
 
-                File.WriteAllText(Path.Combine(recordDir, $"texts{suffix}.json"), text);
+                Dump(Path.Combine(recordDir, $"texts{suffix}.json"), values);
             }
         }
 
         return stats;
     }
-    
-    public void LoadKeyed(string path, MergeMode mode = MergeMode.Full)
+
+    public void Load(string path, MergeMode mode = MergeMode.Full)
     {
         if (!Directory.Exists(path))
             throw new Exception($"Path '{path}' does not exist");
@@ -166,7 +156,7 @@ public class TextStorage<TRecord> : StorageByContext<string, string, TRecord>
         }
     }
 
-    private static List<TRecord> LoadFile(string path, string contextName)
+    private List<TRecord> LoadFile(string path, string contextName)
     {
         var extension = Path.GetExtension(path);
 
@@ -197,17 +187,7 @@ public class TextStorage<TRecord> : StorageByContext<string, string, TRecord>
             }
             case ".json":
             {
-                var text = File.ReadAllText(path);
-                JsonNode? json;
-                try
-                {
-                    json = JsonObject.Parse(text);
-                }
-                catch (Exception e)
-                {
-                    throw new Exception($"Failed to parse json at '{path}': {e.Message}");
-                }
-
+                var json = LoadJson(path);
                 foreach (var obj in json.AsArray())
                 {
                     var record = new TRecord
@@ -218,7 +198,7 @@ public class TextStorage<TRecord> : StorageByContext<string, string, TRecord>
                     
                     record.FromDump(obj.AsObject());
                     if (!record.IsValid)
-                        throw new Exception($"Failed to parse record in json file '{path}': '{json.ToString()}'");
+                        throw new Exception($"Failed to parse record in json file '{path}': '{obj.ToString()}'");
                     records.Add(record);
                 }
                 break;

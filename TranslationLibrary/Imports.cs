@@ -25,10 +25,6 @@ public class Imports
         public string Meta => Marshal.PtrToStringUTF8(MetaPtr) ?? "";
     }
 
-    // [DllImport("kernel32.dll", SetLastError = true)]
-    // [return: MarshalAs(UnmanagedType.Bool)]
-    // public static extern bool AllocConsole();
-
     [DllImport("mwtextlib.dll", CallingConvention = CallingConvention.Cdecl)]
     public static extern IntPtr Translation_GetTexts([MarshalAs(UnmanagedType.LPWStr)] string path,
         [MarshalAs(UnmanagedType.LPStr)] string encoding);

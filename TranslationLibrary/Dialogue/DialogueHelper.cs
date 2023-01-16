@@ -1,9 +1,6 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.IO;
 using System.Linq;
-using System.Text.RegularExpressions;
-using TranslationLibrary.Localization;
 using TranslationLibrary.Storage;
 using TranslationLibrary.Translation;
 
@@ -11,7 +8,7 @@ namespace TranslationLibrary.Dialogue
 {
     public class DialogueHelper
     {
-        public Dictionary<string, StringWithHash> Dialogues { get; private set; } = new();
+        public StorageById<string, StringWithHash> Dialogues { get; private set; } = new();
 
         public static DialogueHelper Create(TranslationState state)
         {
@@ -30,15 +27,14 @@ namespace TranslationLibrary.Dialogue
             return helper;
         }
 
-        public static Dictionary<string, StringWithHash> CollectDialogueTopics(TranslationState state)
+        private void CollectDialogueTopics(TranslationState state)
         {
             var topics = state.Storage.LookupContext("DIAL");
             if (topics == null)
-                return new();
+                return;
 
-            return topics.Select(_ => new StringWithHash() { Value = _.Text }).DistinctBy(_ => _.Value)
-                .OrderByDescending(_ => _.Value.Length)
-                .ToDictionary(_ => _.Value);
+            foreach (var topic in topics)
+                Dialogues.Add(new StringWithHash() { Value = topic.Text });
         }
 
         public void Load(string path)
@@ -46,89 +42,39 @@ namespace TranslationLibrary.Dialogue
             if (!Directory.Exists(path))
                 throw new Exception($"Directory '{path}' does not exist");
 
-            IEnumerable<StringWithHash> collection = new List<StringWithHash>();
-
             foreach (var file in Directory.GetFiles(path))
             {
                 if (Path.GetExtension(file) != ".txt")
                     continue;
 
-                collection = collection.Concat(LoadDialogues(file));
+                LoadDialogues(file);
             }
+        }
 
-            Dialogues = collection.DistinctBy(_ => _.Value).OrderByDescending(_ => _.Value).ToDictionary(_ => _.Value);
+        public void Save(string filePath)
+        {
+            var directory = Path.GetDirectoryName(filePath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
+                throw new Exception($"Directory '{Path.GetDirectoryName(filePath)}' does not exist");
+
+            File.WriteAllLines(filePath, Dialogues.Select(_ => _.Value));
         }
 
         public void Load(TranslationState state, string additionalPath = "")
         {
-            Dialogues = CollectDialogueTopics(state);
+            CollectDialogueTopics(state);
 
             if (!string.IsNullOrEmpty(additionalPath) && Directory.Exists(additionalPath))
                 Load(additionalPath);
         }
 
-        private IEnumerable<StringWithHash> LoadDialogues(string filePath)
+        private void LoadDialogues(string filePath)
         {
-            return File.ReadAllText(filePath).Split("\n").Select(_ => _.Trim())
+            var topics = File.ReadAllLines(filePath)
+                .Where(_ => !string.IsNullOrWhiteSpace(_)).Select(_ => _.Trim())
                 .Where(_ => !string.IsNullOrEmpty(_)).Select(_ => new StringWithHash() { Value = _ });
-        }
-
-        public void Analyze<T>(TextStorage<T> storage, LocalizationStorage localizations) where T : TextRecord, new()
-        {
-            var hyperlinkTopics = CollectHyperlinks(storage);
-
-            Dictionary<string, List<string>> topicProblems = new();
-            List<string> phraseFormProblems = new();
-
-            foreach (var (infoId, topics) in hyperlinkTopics)
-            {
-                foreach (var topic in topics)
-                {
-                    if (topic.Trim() != topic)
-                        topicProblems.GetOrCreate(infoId)
-                            .Add($"Hyperlink for topic '{topic.Trim()}' contains extra spaces");
-
-                    var checkRes = CheckKnownTopicOrPhraseForm(topic.Trim(), localizations);
-                    if (!string.IsNullOrEmpty(checkRes))
-                        topicProblems.GetOrCreate(infoId).Add(checkRes);
-                }
-            }
-
-            foreach (var phraseForm in localizations.DialoguePhraseForms)
-            {
-                if (!Dialogues.ContainsKey(phraseForm.Source))
-                    phraseFormProblems.Add(
-                        $"Phraseform '{phraseForm.Target}' refers to unknown dialogue '{phraseForm.Source}'");
-            }
-        }
-
-        private string CheckKnownTopicOrPhraseForm(string topic, LocalizationStorage localizations)
-        {
-            if (Dialogues.ContainsKey(topic))
-                return "";
-
-            var phraseForm = localizations.DialoguePhraseForms.LookupRecordByTarget(topic);
-            if (phraseForm != null)
-                return "";
-
-            return $"'{topic}' is not a known dialogues or phraseform";
-        }
-
-        private Dictionary<string, List<string>> CollectHyperlinks<T>(TextStorage<T> storage) where T : TextRecord, new()
-        {
-            var infos = storage.LookupContext("INFO");
-            if (infos == null)
-                return new();
-
-            Dictionary<string, List<string>> result = new();
-            foreach (var info in infos)
-            {
-                var matches = Regex.Matches(info.Text, "@([^#])#", RegexOptions.IgnoreCase);
-
-                result[info.ContextId].AddRange(matches.Select(_ => _.Groups[1].Value));
-            }
-
-            return result;
+            foreach (var topic in topics)
+                Dialogues.Add(topic);
         }
     }
 }

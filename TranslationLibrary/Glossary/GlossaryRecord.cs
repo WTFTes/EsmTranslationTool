@@ -8,7 +8,7 @@ namespace TranslationLibrary.Glossary
     public class GlossaryRecord : TextRecord
     {
         public MatchType MatchType { get; set; }
-        
+
         public string OriginalText { get; set; }
 
         public override JsonObject FormatForDump(DumpFlags optionsFlags)

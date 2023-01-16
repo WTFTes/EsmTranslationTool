@@ -23,6 +23,7 @@ namespace TranslationLibrary.Localization
         public LocalizationMappingStore DialogueNames => _dialogueNames;
         public LocalizationMappingStore DialoguePhraseForms => _dialoguePhraseForms;
 
+        public int Size => _cells.Size + _dialogueNames.Size + _dialoguePhraseForms.Size;
         public bool IsEmpty => _cells.Empty && _dialogueNames.Empty && _dialoguePhraseForms.Empty;
 
         public void Clear()
@@ -34,11 +35,11 @@ namespace TranslationLibrary.Localization
         
         public void LoadNative(string path, string encoding, string contextName)
         {
-            var sysEncoding = Helpers.EsmToSysEncoding(encoding);
+            var sysEncoding = EsmEncoding.ToSysEncoding(encoding);
 
-            LoadNativeLocalization(Path.Combine(path, contextName + ".cel"), MappingType.Cell, sysEncoding, _cells);
-            LoadNativeLocalization(Path.Combine(path, contextName + ".mrk"), MappingType.Topic, sysEncoding, _dialogueNames);
-            LoadNativeLocalization(Path.Combine(path, contextName + ".top"), MappingType.Phraseform, sysEncoding, _dialoguePhraseForms);
+            LoadNativeLocalization(Path.Combine(path, contextName + ".cel"), MappingType.Cell, sysEncoding);
+            LoadNativeLocalization(Path.Combine(path, contextName + ".mrk"), MappingType.Topic, sysEncoding);
+            LoadNativeLocalization(Path.Combine(path, contextName + ".top"), MappingType.Phraseform, sysEncoding);
         }
 
         public void Load(string path)
@@ -69,7 +70,8 @@ namespace TranslationLibrary.Localization
 
         public void Save(string path)
         {
-            if (!Directory.Exists(Path.GetDirectoryName(path)))
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                 throw new Exception($"Directory '{Path.GetDirectoryName(path)}' does not exist");
 
             var tmp = _cells.Concat(_dialogueNames).Concat(_dialoguePhraseForms);
@@ -93,19 +95,35 @@ namespace TranslationLibrary.Localization
                 _dialoguePhraseForms.Add(phraseForm);
         }
 
+        public LocalizationStorage Diff(LocalizationStorage otherLocalization)
+        {
+            LocalizationStorage result = new();
+            foreach (var cel in _cells)
+                if (!otherLocalization.Cells.Contains(cel))
+                    result.Cells.Add(cel);
+            foreach (var dialogue in _dialogueNames)
+                if (!otherLocalization.DialogueNames.Contains(dialogue))
+                    result.DialogueNames.Add(dialogue);
+            foreach (var phraseForm in _dialoguePhraseForms)
+                if (!otherLocalization.DialoguePhraseForms.Contains(phraseForm))
+                    result.DialoguePhraseForms.Add(phraseForm);
+
+            return result;
+        }
+
         public void SaveNative(string path, string contextName, string encoding)
         {
             if (!Directory.Exists(path))
                 throw new Exception($"Directory '{path}' does not exist");
 
-            var sysEncoding = Helpers.EsmToSysEncoding(encoding);
+            var sysEncoding = EsmEncoding.ToSysEncoding(encoding);
 
             SaveNativeLocalization(Path.Combine(path, contextName + ".cel"), sysEncoding, _cells);
             SaveNativeLocalization(Path.Combine(path, contextName + ".mrk"), sysEncoding, _dialogueNames);
             SaveNativeLocalization(Path.Combine(path, contextName + ".top"), sysEncoding, _dialoguePhraseForms);
         }
 
-        private void LoadNativeLocalization(string filePath, MappingType type, Encoding encoding, LocalizationMappingStore store)
+        public void LoadNativeLocalization(string filePath, MappingType type, Encoding encoding)
         {
             if (!File.Exists(filePath))
                 return;
@@ -116,20 +134,37 @@ namespace TranslationLibrary.Localization
                 {
                     HasHeaderRecord = false, Delimiter = "\t", Encoding = encoding,
                 });
+
             while (csv.Read())
             {
-                store.Add(new()
+                MappingRecord<string> record = new()
                 {
                     Type = type,
                     Source = csv.GetField<string>(0),
                     Target = csv.GetField<string>(1),
-                });
+                };
+
+                switch (type)
+                {
+                    case MappingType.Cell:
+                        _cells.Add(record);
+                        break;
+                    case MappingType.Topic:
+                        _dialogueNames.Add(record);
+                        break;
+                    case MappingType.Phraseform:
+                        _dialoguePhraseForms.Add(record);
+                        break;
+                    default:
+                        throw new Exception($"Unsupported mapping type {type}");
+                }
             }
         }
 
         private void SaveNativeLocalization(string path, Encoding encoding, LocalizationMappingStore store)
         {
-            if (!Directory.Exists(Path.GetDirectoryName(path)))
+            var directory = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
                 throw new Exception("Directory does not exist");
 
             // overwrite with empty if file exists
@@ -150,45 +185,6 @@ namespace TranslationLibrary.Localization
                 csv.WriteField(item.Target);
 
                 csv.NextRecord();
-            }
-        }
-
-        public void UpdateFromState(TranslationState state)
-        {
-            UpdateMrk(state);
-            UpdateCel(state);
-        }
-
-        private void UpdateMrk(TranslationState state)
-        {
-            var dialogues = state.Storage.LookupContext("DIAL");
-            if (dialogues == null)
-                return;
-
-            foreach (var dialogue in dialogues)
-                if (dialogue.IsTranslated)
-                    _dialogueNames.Add(new()
-                        { Type = MappingType.Topic, Source = dialogue.UnprocessedOriginalText, Target = dialogue.Text });
-        }
-
-        private void UpdateCel(TranslationState state)
-        {
-            var cells = state.Storage.LookupContext("CELL");
-            if (cells != null)
-            {
-                foreach (var cell in cells)
-                    if (cell.IsTranslated)
-                        _cells.Add(new()
-                            { Type = MappingType.Cell, Source = cell.UnprocessedOriginalText, Target = cell.Text });
-            }
-
-            var regions = state.Storage.LookupContext("REGN");
-            if (regions != null)
-            {
-                foreach (var region in regions)
-                    if (region.IsTranslated)
-                        _cells.Add(new()
-                            { Type = MappingType.Cell, Source = region.UnprocessedOriginalText, Target = region.Text });
             }
         }
     }

@@ -1,9 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.IO;
 using System.Linq;
 using TranslationLibrary.Enums;
-using TranslationLibrary.Storage;
 using TranslationLibrary.Translation;
 
 namespace TranslationLibrary.Glossary

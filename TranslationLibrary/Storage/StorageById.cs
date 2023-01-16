@@ -46,6 +46,8 @@ public class StorageById<TId, TRecord> : AbstractStorage<TRecord>
         return RecordsById.GetValueOrDefault(id);
     }
 
+    public bool HasRecord(TId id) => LookupRecord(id) != null;
+    
     public override IEnumerator<TRecord> GetEnumerator()
     {
         foreach (var (_, record) in RecordsById)

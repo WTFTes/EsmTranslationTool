@@ -1,10 +1,12 @@
 ﻿using System;
 using System.Linq;
+using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using TranslationLibrary.Storage.Interfaces;
 
 namespace TranslationLibrary;
 
-public class StringWithHash
+public class StringWithHash : IRecordWithId<string>
 {
     private string _value = "";
 
@@ -18,6 +20,7 @@ public class StringWithHash
         }
     }
 
+    [JsonIgnore]
     public int[] PartHashes { get; private set; } = Array.Empty<int>();
 
     public static int[] GetStringPartHashes(string text)
@@ -26,5 +29,10 @@ public class StringWithHash
 
         return text.ToLowerInvariant().Split(" ", StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries)
             .Select(_ => _.GetHashCode()).ToArray();
+    }
+
+    public string GetId()
+    {
+        return _value;
     }
 }
